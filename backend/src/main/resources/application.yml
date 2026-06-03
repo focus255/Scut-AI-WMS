@@ -1,0 +1,65 @@
+# ===================================================================
+# 智库WMS - 智能仓储管理系统 配置文件
+# @author Focus
+# @date 2026-06-03
+# ===================================================================
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: smart-wms-backend
+
+  # ---- 数据源配置（默认使用 H2 便于开发，生产切换为 MySQL） ----
+  datasource:
+    # 开发环境：H2 内存数据库（无需安装 MySQL 即可启动）
+    url: jdbc:h2:mem:smart_wms_db;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+    # 生产环境 MySQL 配置（通过环境变量注入覆盖）
+    # url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/smart_wms_db?useSSL=false&serverTimezone=GMT%2B8}
+    # driver-class-name: com.mysql.cj.jdbc.Driver
+    # username: ${SPRING_DATASOURCE_USERNAME:root}
+    # password: ${SPRING_DATASOURCE_PASSWORD:WmsRootPassword2026}
+
+  # ---- H2 Web 控制台（仅开发环境） ----
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # ---- SQL 初始化 ----
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/init_script.sql
+      encoding: UTF-8
+
+# ---- MyBatis-Plus 配置 ----
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# ---- AI 大模型配置（通过环境变量注入，避免硬编码） ----
+ai:
+  llm:
+    api-key: ${AI_LLM_API_KEY:demo-api-key}
+    base-url: ${AI_LLM_BASE_URL:https://api.llm-provider.com/v1}
+    connect-timeout: 3000   # 连接超时 3 秒
+    read-timeout: 10000     # 读取超时 10 秒
+
+# ---- 日志配置 ----
+logging:
+  level:
+    root: INFO
+    com.smartwms: DEBUG
+    com.smartwms.mapper: DEBUG

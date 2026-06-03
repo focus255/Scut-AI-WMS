@@ -1,0 +1,39 @@
+# ============================================
+# 智库WMS Git 忽略规则
+# ============================================
+
+# ---- Java / Maven ----
+target/
+*.class
+*.jar
+*.war
+*.log
+.idea/
+*.iml
+.settings/
+.project
+.classpath
+bin/
+
+# ---- Node / Vite ----
+node_modules/
+dist/
+.vite/
+*.local
+
+# ---- 环境变量 / 密钥 ----
+.env
+.env.*
+*.pem
+application-local.yml
+
+# ---- OS 文件 ----
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ---- Claude / AI 配置（全局排除，此处兜底） ----
+.claude/
+.claude-local/
+CLAUDE.local.md
