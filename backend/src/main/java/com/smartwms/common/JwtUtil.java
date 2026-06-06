@@ -13,7 +13,9 @@ import io.jsonwebtoken.security.Keys;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 
 public class JwtUtil {
 
@@ -25,46 +27,50 @@ public class JwtUtil {
 
     /** 令牌有效期：2 小时（毫秒） */
     private static final long EXPIRATION_MS = 2 * 60 * 60 * 1000L;
+    private static final String CLAIM_USERNAME = "username";
+    private static final String CLAIM_ROLES = "roles";
 
     private JwtUtil() {}
 
-    /**
-     * 生成 JWT 令牌。
-     *
-     * @param userId 用户主键 ID
-     * @return 签发的 JWT 字符串
-     */
-    public static String generateToken(Long userId) {
+    public static String generateToken(Long userId, String username, List<String> roles) {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + EXPIRATION_MS);
 
         return Jwts.builder()
                 .subject(String.valueOf(userId))
+                .claim(CLAIM_USERNAME, username)
+                .claim(CLAIM_ROLES, roles)
                 .issuedAt(now)
                 .expiration(expiration)
                 .signWith(SECRET_KEY)
                 .compact();
     }
 
-    /**
-     * 解析并校验 JWT 令牌，提取用户 ID。
-     *
-     * @param token JWT 令牌字符串
-     * @return 用户 ID
-     * @throws JwtException 令牌无效或过期时抛出
-     */
-    public static Long parseToken(String token) {
-        Claims claims = Jwts.parser()
+    public static Claims parseToken(String token) throws JwtException {
+        return Jwts.parser()
                 .verifyWith(SECRET_KEY)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+
+    public static Long getUserId(Claims claims) {
         return Long.valueOf(claims.getSubject());
     }
 
-    /**
-     * 获取令牌过期时间（毫秒）。
-     */
+    public static String getUsername(Claims claims) {
+        return claims.get(CLAIM_USERNAME, String.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static List<String> getRoles(Claims claims) {
+        Object roles = claims.get(CLAIM_ROLES);
+        if (roles instanceof List<?> roleList) {
+            return roleList.stream().map(String::valueOf).toList();
+        }
+        return Collections.emptyList();
+    }
+
     public static long getExpirationMs() {
         return EXPIRATION_MS;
     }

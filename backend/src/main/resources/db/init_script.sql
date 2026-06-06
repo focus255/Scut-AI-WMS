@@ -1,5 +1,5 @@
 -- ===================================================================
--- 智库WMS - 数据库初始化脚本（11 张表）
+-- 智库WMS - 数据库初始化脚本
 -- 种子数据由 DataInitializer 通过 JDBC 插入，避免 H2 编码问题
 -- @author Focus
 -- @date 2026-06-03
@@ -10,11 +10,50 @@ CREATE TABLE IF NOT EXISTS `users` (
   `user_id`    BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
   `username`   VARCHAR(100) NOT NULL UNIQUE COMMENT '登录账号',
   `password`   VARCHAR(255) NOT NULL COMMENT 'BCrypt加密散列密码',
+  `nickname`   VARCHAR(100) NOT NULL DEFAULT '' COMMENT '用户昵称',
+  `status`     VARCHAR(20) NOT NULL DEFAULT 'ENABLED' COMMENT '用户状态: ENABLED / DISABLED',
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 2. 物料基础档案表
+-- 2. 角色表
+CREATE TABLE IF NOT EXISTS `roles` (
+  `id`         BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+  `role_code`  VARCHAR(100) NOT NULL UNIQUE COMMENT '角色编码',
+  `role_name`  VARCHAR(100) NOT NULL COMMENT '角色名称',
+  `remark`     VARCHAR(255) DEFAULT '' COMMENT '备注',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 3. 权限表
+CREATE TABLE IF NOT EXISTS `permissions` (
+  `id`              BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+  `permission_code` VARCHAR(100) NOT NULL UNIQUE COMMENT '权限编码',
+  `permission_name` VARCHAR(100) NOT NULL COMMENT '权限名称',
+  `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 4. 用户角色关联表
+CREATE TABLE IF NOT EXISTS `user_roles` (
+  `id`         BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+  `user_id`    BIGINT NOT NULL COMMENT '用户ID',
+  `role_id`    BIGINT NOT NULL COMMENT '角色ID',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (`user_id`, `role_id`)
+);
+
+-- 5. 角色权限关联表
+CREATE TABLE IF NOT EXISTS `role_permissions` (
+  `id`            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+  `role_id`       BIGINT NOT NULL COMMENT '角色ID',
+  `permission_id` BIGINT NOT NULL COMMENT '权限ID',
+  `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (`role_id`, `permission_id`)
+);
+
+-- 6. 物料基础档案表
 CREATE TABLE IF NOT EXISTS `materials` (
   `id`            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
   `material_code` VARCHAR(100) NOT NULL UNIQUE COMMENT '物料号/零件号',
@@ -26,7 +65,7 @@ CREATE TABLE IF NOT EXISTS `materials` (
   `updated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 3. 器具包装参数表
+-- 7. 器具包装参数表
 CREATE TABLE IF NOT EXISTS `appliances` (
   `id`            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
   `material_code` VARCHAR(100) NOT NULL COMMENT '关联物料号',
@@ -37,16 +76,20 @@ CREATE TABLE IF NOT EXISTS `appliances` (
   `updated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 4. 供应商名录表
+-- 8. 供应商名录表
 CREATE TABLE IF NOT EXISTS `suppliers` (
-  `id`            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
-  `supplier_code` VARCHAR(100) NOT NULL UNIQUE COMMENT '供应商唯一代码',
-  `supplier_name` VARCHAR(255) NOT NULL COMMENT '供应商企业名称',
-  `created_at`    DATETIME DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `id`             BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+  `supplier_code`  VARCHAR(100) NOT NULL UNIQUE COMMENT '供应商唯一代码',
+  `supplier_name`  VARCHAR(255) NOT NULL COMMENT '供应商企业名称',
+  `contact_name`   VARCHAR(100) DEFAULT '' COMMENT '联系人',
+  `contact_phone`  VARCHAR(50) DEFAULT '' COMMENT '联系电话',
+  `created_by`     VARCHAR(100) DEFAULT 'system',
+  `updated_by`     VARCHAR(100) DEFAULT 'system',
+  `created_at`     DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 5. 物理实际库存记录表
+-- 9. 物理实际库存记录表
 CREATE TABLE IF NOT EXISTS `inventories` (
   `id`             BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
   `material_code`  VARCHAR(100) NOT NULL UNIQUE COMMENT '物料号',
@@ -57,7 +100,7 @@ CREATE TABLE IF NOT EXISTS `inventories` (
   `updated_at`     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 6. 手工入库订单主表
+-- 10. 手工入库订单主表
 CREATE TABLE IF NOT EXISTS `inbound_orders` (
   `id`            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
   `order_no`      VARCHAR(100) NOT NULL UNIQUE COMMENT '手工入库单号(全局唯一)',
@@ -67,7 +110,7 @@ CREATE TABLE IF NOT EXISTS `inbound_orders` (
   `updated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 7. 入库单行项目明细表
+-- 11. 入库单行项目明细表
 CREATE TABLE IF NOT EXISTS `inbound_details` (
   `id`            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '明细主键',
   `inbound_id`    BIGINT NOT NULL COMMENT '关联主表自增ID',
@@ -79,7 +122,7 @@ CREATE TABLE IF NOT EXISTS `inbound_details` (
   `created_at`    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 8. 物料出库单主表
+-- 12. 物料出库单主表
 CREATE TABLE IF NOT EXISTS `outbound_orders` (
   `id`         BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
   `order_no`   VARCHAR(100) NOT NULL UNIQUE COMMENT '出库业务单号',
@@ -88,7 +131,7 @@ CREATE TABLE IF NOT EXISTS `outbound_orders` (
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 9. 出库单行项目明细表
+-- 13. 出库单行项目明细表
 CREATE TABLE IF NOT EXISTS `outbound_details` (
   `id`            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '明细ID',
   `outbound_id`   BIGINT NOT NULL COMMENT '主表ID',
@@ -100,7 +143,7 @@ CREATE TABLE IF NOT EXISTS `outbound_details` (
   `created_at`    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 10. 物料器具条码追踪表
+-- 14. 物料器具条码追踪表
 CREATE TABLE IF NOT EXISTS `barcodes` (
   `id`            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
   `material_code` VARCHAR(100) NOT NULL COMMENT '零件编码',
@@ -111,7 +154,7 @@ CREATE TABLE IF NOT EXISTS `barcodes` (
   `updated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 11. AI库存推演与智能决策报告表
+-- 15. AI库存推演与智能决策报告表
 CREATE TABLE IF NOT EXISTS `ai_inventory_reports` (
   `id`                       BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键报告ID',
   `material_code`            VARCHAR(100) NOT NULL COMMENT '预测目标物料号',

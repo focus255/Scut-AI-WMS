@@ -19,6 +19,9 @@ public final class ErrorCode {
     /** 未登录或 JWT 令牌失效 */
     public static final int UNAUTHORIZED = 401;
 
+    /** 已登录但无权限 */
+    public static final int FORBIDDEN = 403;
+
     /** 资源不存在 */
     public static final int NOT_FOUND = 404;
 

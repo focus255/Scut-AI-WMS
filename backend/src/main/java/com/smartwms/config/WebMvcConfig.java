@@ -6,6 +6,7 @@
  */
 package com.smartwms.config;
 
+import com.smartwms.interceptor.AuthorizationInterceptor;
 import com.smartwms.interceptor.JwtInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -15,18 +16,28 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebMvcConfig implements WebMvcConfigurer {
 
     private final JwtInterceptor jwtInterceptor;
+    private final AuthorizationInterceptor authorizationInterceptor;
 
-    public WebMvcConfig(JwtInterceptor jwtInterceptor) {
+    public WebMvcConfig(JwtInterceptor jwtInterceptor,
+                        AuthorizationInterceptor authorizationInterceptor) {
         this.jwtInterceptor = jwtInterceptor;
+        this.authorizationInterceptor = authorizationInterceptor;
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(jwtInterceptor)
-                .addPathPatterns("/api/**")                     // 拦截所有 API 请求
+                .addPathPatterns("/api/**")
                 .excludePathPatterns(
-                        "/api/auth/login",        // 放行登录接口
-                        "/api/auth/register"      // 放行注册接口
+                        "/api/auth/login",
+                        "/api/auth/register"
+                );
+
+        registry.addInterceptor(authorizationInterceptor)
+                .addPathPatterns("/api/**")
+                .excludePathPatterns(
+                        "/api/auth/login",
+                        "/api/auth/register"
                 );
     }
 }

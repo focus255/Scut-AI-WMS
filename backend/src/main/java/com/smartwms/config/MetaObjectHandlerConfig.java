@@ -7,6 +7,7 @@
 package com.smartwms.config;
 
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
+import com.smartwms.common.BaseContext;
 import org.apache.ibatis.reflection.MetaObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,18 +23,19 @@ public class MetaObjectHandlerConfig implements MetaObjectHandler {
     @Override
     public void insertFill(MetaObject metaObject) {
         LocalDateTime now = LocalDateTime.now();
-        // 对标记了 @TableField(fill = FieldFill.INSERT) 的字段自动赋值
+        String username = BaseContext.getCurrentUsername();
+        String operator = username == null || username.isBlank() ? "system" : username;
         this.strictInsertFill(metaObject, "createdAt", LocalDateTime.class, now);
         this.strictInsertFill(metaObject, "updatedAt", LocalDateTime.class, now);
-        // 审计字段
-        this.strictInsertFill(metaObject, "createdBy", String.class, "system");
-        this.strictInsertFill(metaObject, "updatedBy", String.class, "system");
+        this.strictInsertFill(metaObject, "createdBy", String.class, operator);
+        this.strictInsertFill(metaObject, "updatedBy", String.class, operator);
     }
 
     @Override
     public void updateFill(MetaObject metaObject) {
-        // 对标记了 @TableField(fill = FieldFill.INSERT_UPDATE) 的字段自动赋值
+        String username = BaseContext.getCurrentUsername();
+        String operator = username == null || username.isBlank() ? "system" : username;
         this.strictUpdateFill(metaObject, "updatedAt", LocalDateTime.class, LocalDateTime.now());
-        this.strictUpdateFill(metaObject, "updatedBy", String.class, "system");
+        this.strictUpdateFill(metaObject, "updatedBy", String.class, operator);
     }
 }
