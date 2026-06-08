@@ -84,9 +84,13 @@
 /**
  * 入库与出库管理。
  */
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getInboundOrders, createInbound, confirmInbound } from '@/api/inbound'
+
+const route = useRoute()
+const router = useRouter()
 
 const activeTab = ref('inbound')
 
@@ -104,7 +108,15 @@ const inboundRules = {
   supplierCode: [{ required: true, message: '请选择供应商', trigger: 'change' }]
 }
 
-onMounted(() => loadOrders())
+onMounted(() => {
+  loadOrders()
+  applyAiInboundDraft()
+})
+
+watch(
+  () => route.query,
+  () => applyAiInboundDraft()
+)
 
 async function loadOrders() {
   inboundLoading.value = true
@@ -127,6 +139,24 @@ function openInboundDialog() {
   inboundForm.supplierCode = ''
   inboundForm.details = [{ materialCode: '', packCapacity: 20, planQty: 200 }]
   dialogVisible.value = true
+}
+
+function applyAiInboundDraft() {
+  const materialCode = String(route.query.materialCode || '').trim()
+  const suggestedQty = Number(route.query.suggestedQty || 0)
+  if (!materialCode || suggestedQty <= 0) return
+
+  activeTab.value = 'inbound'
+  inboundForm.supplierCode = ''
+  inboundForm.details = [{
+    materialCode,
+    packCapacity: 20,
+    planQty: suggestedQty
+  }]
+  dialogVisible.value = true
+  ElMessage.info('已根据 AI 建议预填入库明细，请选择供应商后保存')
+
+  router.replace({ path: route.path, query: {} })
 }
 
 async function handleCreate() {
