@@ -40,6 +40,11 @@
           <el-icon :size="18"><Cpu /></el-icon>
           <span class="nav-label">AI 智能报告</span>
         </router-link>
+        <router-link to="/inventory-trace" class="nav-item"
+          :class="{ active: $route.path.startsWith('/inventory-trace') }">
+          <el-icon :size="18"><Search /></el-icon>
+          <span class="nav-label">库存追溯</span>
+        </router-link>
       </nav>
 
       <div class="sidebar-footer" @click="isCollapse = !isCollapse">

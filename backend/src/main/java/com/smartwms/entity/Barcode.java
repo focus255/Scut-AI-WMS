@@ -24,6 +24,9 @@ public class Barcode {
     /** 唯一箱单标签条码号 */
     private String barcode;
 
+    /** 关联入库单主键 ID（追溯条码来源） */
+    private Long inboundId;
+
     /** 条码生命周期：待入库 / 在库 / 已出库 */
     private String status;
 
@@ -46,6 +49,9 @@ public class Barcode {
 
     public String getBarcode() { return barcode; }
     public void setBarcode(String barcode) { this.barcode = barcode; }
+
+    public Long getInboundId() { return inboundId; }
+    public void setInboundId(Long inboundId) { this.inboundId = inboundId; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }

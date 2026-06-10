@@ -39,13 +39,20 @@
               </template>
             </el-table-column>
             <el-table-column prop="createdAt" label="创建时间" min-width="170" show-overflow-tooltip />
-            <el-table-column label="操作" width="140" align="center">
+            <el-table-column label="操作" width="260" align="center">
               <template #default="{ row }">
+                <el-button v-if="row.status !== '已完成'" type="primary" link size="small"
+                  @click.stop="openEditDialog(row)">
+                  编辑
+                </el-button>
                 <el-button v-if="row.status !== '已完成'" type="success" link size="small"
                   @click.stop="openConfirmDialog(row)">
                   确认入库
                 </el-button>
-                <span v-else class="muted-text">无需操作</span>
+                <el-button link size="small" @click.stop="openPrintDialog(row)">
+                  <el-icon :size="14"><Printer /></el-icon>打印
+                </el-button>
+                <span v-if="row.status === '已完成'" class="muted-text">无需操作</span>
               </template>
             </el-table-column>
           </el-table>
@@ -190,6 +197,101 @@
         </template>
       </el-dialog>
     </Teleport>
+
+    <!-- 修改入库单对话框 (Teleport to body) -->
+    <Teleport to="body">
+      <el-dialog v-model="editVisible" title="修改入库单"
+        width="min(720px, calc(100vw - 32px))" destroy-on-close>
+        <el-alert title="修改后需重新确认入库，原确认信息将被清除。"
+          type="warning" show-icon :closable="false" class="draft-alert" />
+        <el-form ref="editFormRef" :model="editForm" :rules="inboundRules" label-width="88px">
+          <el-form-item label="供应商" prop="supplierCode">
+            <el-select v-model="editForm.supplierCode" placeholder="请选择供应商" style="width: 100%" filterable>
+              <el-option v-for="s in supplierOptions" :key="s.supplierCode"
+                :label="`${s.supplierName} (${s.supplierCode})`" :value="s.supplierCode" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="物料明细" prop="details">
+            <div class="detail-editor">
+              <div class="detail-head">
+                <span>物料号</span><span>单箱容量</span><span>计划入库数</span><span>操作</span>
+              </div>
+              <div v-for="(item, idx) in editForm.details" :key="idx" class="detail-row">
+                <el-select v-model="item.materialCode" placeholder="搜索物料号" size="small"
+                  filterable remote :remote-method="(q) => searchEditMaterials(q, idx)"
+                  :loading="editMaterialLoading[idx]" clearable style="width: 100%"
+                  @focus="searchEditMaterials('', idx)">
+                  <el-option v-for="m in editMaterialOptions[idx]" :key="m.materialCode"
+                    :label="`${m.materialCode} — ${m.materialName}`" :value="m.materialCode" />
+                </el-select>
+                <el-input-number v-model="item.packCapacity" :min="1" :max="999999" size="small" controls-position="right" />
+                <el-input-number v-model="item.planQty" :min="1" :max="999999" size="small" controls-position="right" />
+                <el-button type="danger" link size="small" @click="removeEditDetail(idx)"
+                  :disabled="editForm.details.length <= 1">
+                  <el-icon :size="14"><Delete /></el-icon><span>删除</span>
+                </el-button>
+              </div>
+              <div class="detail-actions">
+                <el-button type="primary" link size="small" @click="addEditDetail">
+                  <el-icon :size="14"><Plus /></el-icon><span>添加物料行</span>
+                </el-button>
+              </div>
+            </div>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <div class="dialog-footer">
+            <span class="footer-tip">修改后需重新确认入库。</span>
+            <div>
+              <el-button @click="editVisible = false">取消</el-button>
+              <el-button type="primary" :loading="editSubmitting" @click="handleEditSubmit">保存修改</el-button>
+            </div>
+          </div>
+        </template>
+      </el-dialog>
+    </Teleport>
+
+    <!-- 打印入库单对话框 (Teleport to body) -->
+    <Teleport to="body">
+      <el-dialog v-model="printVisible" title="打印预览 — 入库单"
+        width="min(700px, calc(100vw - 32px))" destroy-on-close>
+        <div class="print-area" id="printInboundArea">
+          <div v-if="printOrder" class="print-content">
+            <h2>智库 WMS — 入库单</h2>
+            <div class="print-meta">
+              <span><strong>单号：</strong>{{ printOrder.orderNo }}</span>
+              <span><strong>供应商：</strong>{{ printOrder.supplierCode }}</span>
+              <span><strong>状态：</strong>{{ printOrder.status }}</span>
+              <span><strong>创建时间：</strong>{{ printOrder.createdAt }}</span>
+            </div>
+            <table class="print-table">
+              <thead>
+                <tr>
+                  <th>序号</th><th>物料号</th><th>单箱容量</th><th>计划数</th><th>实收数</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(d, i) in printOrder.details" :key="i">
+                  <td>{{ i + 1 }}</td>
+                  <td>{{ d.materialCode }}</td>
+                  <td>{{ d.packCapacity }}</td>
+                  <td>{{ d.planQty }}</td>
+                  <td>{{ d.actualQty }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="print-footer">
+              <span>打印时间：{{ new Date().toLocaleString('zh-CN') }}</span>
+              <span>操作员：{{ userStore?.username || '—' }}</span>
+            </div>
+          </div>
+        </div>
+        <template #footer>
+          <el-button @click="printVisible = false">关闭</el-button>
+          <el-button type="primary" @click="doPrint">打印</el-button>
+        </template>
+      </el-dialog>
+    </Teleport>
   </div>
 </template>
 
@@ -200,12 +302,15 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getInboundOrders, createInbound, confirmInbound, getInboundDetail } from '@/api/inbound'
+import { Plus, Delete, Printer } from '@element-plus/icons-vue'
+import { getInboundOrders, createInbound, updateInbound, confirmInbound, getInboundDetail } from '@/api/inbound'
 import { getSuppliers } from '@/api/suppliers'
 import { getMaterials } from '@/api/materials'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 const activeTab = ref('inbound')
 
@@ -233,6 +338,18 @@ const inboundRules = {
 const materialOptions = ref({})
 const materialSearchLoading = ref({})
 
+// ==================== 修改入库单 ====================
+const editVisible = ref(false)
+const editFormRef = ref(null)
+const editTarget = ref(null)
+const editSubmitting = ref(false)
+const editMaterialOptions = ref({})
+const editMaterialLoading = ref({})
+const editForm = reactive({
+  supplierCode: '',
+  details: [{ materialCode: '', packCapacity: 20, planQty: 200 }]
+})
+
 // ==================== 确认入库 ====================
 const confirmVisible = ref(false)
 const confirmTarget = ref(null)
@@ -242,6 +359,10 @@ const confirmSubmitting = ref(false)
 // ==================== 入库单详情 ====================
 const detailVisible = ref(false)
 const detailData = ref(null)
+
+// ==================== 打印 ====================
+const printVisible = ref(false)
+const printOrder = ref(null)
 
 // ==================== 计算属性 ====================
 const pendingCount = computed(() => inboundList.value.filter(row => row.status !== '已完成').length)
@@ -379,6 +500,71 @@ async function handleConfirmSubmit() {
   }
 }
 
+// ==================== 修改入库单 ====================
+async function searchEditMaterials(query, idx) {
+  editMaterialLoading.value[idx] = true
+  try {
+    const data = await getMaterials({ page: 1, size: 20, keyword: query || undefined })
+    editMaterialOptions.value[idx] = data.records || []
+  } catch {
+    editMaterialOptions.value[idx] = []
+  } finally {
+    editMaterialLoading.value[idx] = false
+  }
+}
+
+function addEditDetail() {
+  editForm.details.push({ materialCode: '', packCapacity: 20, planQty: 100 })
+}
+function removeEditDetail(idx) {
+  if (editForm.details.length > 1) editForm.details.splice(idx, 1)
+}
+
+async function openEditDialog(row) {
+  editTarget.value = row
+  editSubmitting.value = false
+  editMaterialOptions.value = {}
+  try {
+    const data = await getInboundDetail(row.id)
+    editForm.supplierCode = data.supplierCode || ''
+    editForm.details = (data.details || []).map(d => ({
+      materialCode: d.materialCode || '',
+      packCapacity: d.packCapacity || 20,
+      planQty: d.planQty || 100
+    }))
+    if (editForm.details.length === 0) {
+      editForm.details = [{ materialCode: '', packCapacity: 20, planQty: 200 }]
+    }
+    editVisible.value = true
+  } catch {
+    ElMessage.error('加载入库单详情失败')
+  }
+}
+
+async function handleEditSubmit() {
+  const valid = await editFormRef.value.validate().catch(() => false)
+  if (!valid) return
+  const invalid = editForm.details.find(d =>
+    !d.materialCode?.trim() || !d.packCapacity || !d.planQty
+  )
+  if (invalid) {
+    ElMessage.warning('请完整填写每一行物料明细')
+    return
+  }
+  editSubmitting.value = true
+  try {
+    await updateInbound(editTarget.value.id, {
+      supplierCode: editForm.supplierCode,
+      details: editForm.details
+    })
+    ElMessage.success('入库单修改成功')
+    editVisible.value = false
+    loadOrders()
+  } catch { /* */ } finally {
+    editSubmitting.value = false
+  }
+}
+
 // ==================== 入库单详情 ====================
 async function openDetailDialog(row) {
   detailData.value = null
@@ -388,6 +574,45 @@ async function openDetailDialog(row) {
   } catch {
     detailVisible.value = false
   }
+}
+
+// ==================== 打印入库单 ====================
+async function openPrintDialog(row) {
+  printOrder.value = null
+  printVisible.value = true
+  try {
+    printOrder.value = await getInboundDetail(row.id)
+  } catch {
+    ElMessage.error('加载入库单详情失败')
+    printVisible.value = false
+  }
+}
+
+function doPrint() {
+  const printContent = document.getElementById('printInboundArea')
+  if (!printContent) return
+  const win = window.open('', '_blank', 'width=800,height=600')
+  win.document.write(`
+    <html><head><title>打印入库单</title>
+    <style>
+      body { font-family: 'Microsoft YaHei', sans-serif; padding: 20px; color: #333; }
+      h2 { text-align: center; margin-bottom: 16px; font-size: 18px; }
+      .print-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+        margin-bottom: 20px; padding: 10px; background: #f5f5f5; border-radius: 4px; }
+      .print-meta span { font-size: 13px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+      th, td { border: 1px solid #333; padding: 6px 10px; text-align: left; font-size: 14px; }
+      th { background: #e0e0e0; }
+      .print-footer { display: flex; justify-content: space-between;
+        font-size: 12px; color: #666; margin-top: 20px; padding-top: 12px; border-top: 1px solid #ccc; }
+      @media print { body { padding: 0; } }
+    </style></head><body>
+    ${printContent.innerHTML}
+    </body></html>
+  `)
+  win.document.close()
+  win.focus()
+  setTimeout(() => { win.print(); win.close() }, 300)
 }
 </script>
 
@@ -551,6 +776,51 @@ async function openDetailDialog(row) {
 }
 .badge-success { background: #f0f9eb; color: #67c23a; }
 .badge-default { background: #f4f4f5; color: #909399; }
+
+/* ==================== 打印预览 ==================== */
+.print-area {
+  min-height: 200px;
+}
+.print-content h2 {
+  text-align: center;
+  margin-bottom: 12px;
+  font-size: 18px;
+}
+.print-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 10px;
+  background: #f7f9fc;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+.print-meta span {
+  font-size: 13px;
+}
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.print-table th, .print-table td {
+  border: 1px solid var(--border-base);
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 13px;
+}
+.print-table th {
+  background: #f0f2f5;
+  font-weight: 600;
+}
+.print-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+}
 
 /* ==================== 响应式 ==================== */
 @media (max-width: 760px) {

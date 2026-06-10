@@ -149,6 +149,7 @@ CREATE TABLE IF NOT EXISTS `barcodes` (
   `material_code` VARCHAR(100) NOT NULL COMMENT '零件编码',
   `supplier_code` VARCHAR(100) NOT NULL COMMENT '生产供应商',
   `barcode`       VARCHAR(150) NOT NULL UNIQUE COMMENT '唯一箱单标签条码号',
+  `inbound_id`    BIGINT DEFAULT NULL COMMENT '关联入库单主键ID，用于精确追溯条码来源',
   `status`        VARCHAR(50) NOT NULL DEFAULT '待入库' COMMENT '条码生命周期: 待入库 / 在库 / 已出库',
   `created_at`    DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

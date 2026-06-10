@@ -53,6 +53,12 @@ const routes = [
         name: 'AiReport',
         component: () => import('@/views/AiReport.vue'),
         meta: { title: 'AI 风险预测与智能报告' }
+      },
+      {
+        path: 'inventory-trace',
+        name: 'InventoryTrace',
+        component: () => import('@/views/InventoryTrace.vue'),
+        meta: { title: '库存追溯' }
       }
     ]
   },
