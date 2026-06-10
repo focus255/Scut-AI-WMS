@@ -191,6 +191,26 @@
           <el-table-column prop="planQty" label="计划数" width="80" align="right" />
           <el-table-column prop="actualQty" label="实收数" width="80" align="right" />
         </el-table>
+        <!-- 条码图形展示（每行独占，可点击下载） -->
+        <div v-if="detailData && detailData.barcodes && detailData.barcodes.length > 0"
+          class="barcode-gallery">
+          <div class="barcode-gallery-title">二维码（共 {{ detailData.barcodes.length }} 个，点击可下载 PNG）</div>
+          <div class="barcode-list-vertical">
+            <div v-for="bc in detailData.barcodes" :key="bc.barcode" class="barcode-row"
+              @click="downloadBarcode(bc, $event)">
+              <div class="barcode-row-header">
+                <span class="barcode-row-label">{{ bc.barcode }}</span>
+                <span class="barcode-status-tag" :class="bc.status === '在库' ? 'tag-in-stock' : 'tag-pending'">
+                  {{ bc.status }}
+                </span>
+                <el-icon :size="14" class="download-icon"><Download /></el-icon>
+              </div>
+              <div class="barcode-row-image" :ref="el => setBarcodeRef(bc.barcode, el)">
+                <QRCode :value="bc.barcode" :height="60" :display-value="false" />
+              </div>
+            </div>
+          </div>
+        </div>
         <div v-else class="empty-hint" style="padding: 30px 0">加载中...</div>
         <template #footer>
           <el-button @click="detailVisible = false">关闭</el-button>
@@ -280,6 +300,17 @@
                 </tr>
               </tbody>
             </table>
+            <!-- 条码图形 -->
+            <div v-if="printOrder.barcodes && printOrder.barcodes.length > 0"
+              class="print-barcodes">
+              <div class="barcode-gallery-title">条码标签</div>
+              <div class="barcode-list">
+                <div v-for="bc in printOrder.barcodes" :key="bc.barcode" class="barcode-item">
+                  <QRCode :value="bc.barcode" :height="40" />
+                  <span style="font-size: 11px;">{{ bc.status }}</span>
+                </div>
+              </div>
+            </div>
             <div class="print-footer">
               <span>打印时间：{{ new Date().toLocaleString('zh-CN') }}</span>
               <span>操作员：{{ userStore?.username || '—' }}</span>
@@ -302,11 +333,12 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Plus, Delete, Printer } from '@element-plus/icons-vue'
+import { Plus, Delete, Printer, Download } from '@element-plus/icons-vue'
 import { getInboundOrders, createInbound, updateInbound, confirmInbound, getInboundDetail } from '@/api/inbound'
 import { getSuppliers } from '@/api/suppliers'
 import { getMaterials } from '@/api/materials'
 import { useUserStore } from '@/stores/user'
+import QRCode from '@/components/QRCode.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -565,6 +597,39 @@ async function handleEditSubmit() {
   }
 }
 
+// ==================== 条码下载 ====================
+/** 存储每个条码的 DOM 引用，用于导出图片 */
+const barcodeRefs = {}
+
+function setBarcodeRef(barcode, el) {
+  if (el) barcodeRefs[barcode] = el
+}
+
+/**
+ * 下载二维码 PNG 位图。
+ */
+function downloadBarcode(bc, event) {
+  event.stopPropagation()
+  const wrapper = barcodeRefs[bc.barcode]
+  if (!wrapper) return
+  const canvas = wrapper.querySelector('canvas')
+  if (!canvas) return
+
+  // 直接导出为 PNG 位图
+  const sanitized = bc.barcode.replace(/\|/g, '-')
+  canvas.toBlob((blob) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${sanitized}.png`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage.success('二维码已下载')
+  }, 'image/png')
+}
+
 // ==================== 入库单详情 ====================
 async function openDetailDialog(row) {
   detailData.value = null
@@ -776,6 +841,75 @@ function doPrint() {
 }
 .badge-success { background: #f0f9eb; color: #67c23a; }
 .badge-default { background: #f4f4f5; color: #909399; }
+
+/* ==================== 条码画廊（竖排，可点击下载） ==================== */
+.barcode-gallery {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+}
+.barcode-gallery-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+.barcode-list-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+.barcode-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.barcode-row:hover {
+  border-color: var(--wms-primary);
+  box-shadow: 0 1px 6px rgba(64, 158, 255, 0.15);
+}
+.barcode-row-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.barcode-row-label {
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-regular);
+  flex: 1;
+}
+.download-icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.barcode-row:hover .download-icon {
+  color: var(--wms-primary);
+}
+.barcode-row-image {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+.barcode-row-image :deep(canvas) {
+  max-width: 100%;
+}
+.barcode-status-tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.tag-in-stock { background: #f0f9eb; color: #67c23a; }
+.tag-pending { background: #fdf6ec; color: #e6a23c; }
 
 /* ==================== 打印预览 ==================== */
 .print-area {

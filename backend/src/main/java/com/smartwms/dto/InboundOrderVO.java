@@ -6,9 +6,11 @@
  */
 package com.smartwms.dto;
 
+import com.smartwms.entity.Barcode;
 import com.smartwms.entity.InboundDetail;
 import com.smartwms.entity.InboundOrder;
 
+import java.util.Collections;
 import java.util.List;
 
 public class InboundOrderVO {
@@ -20,11 +22,12 @@ public class InboundOrderVO {
     private String createdAt;
     private String updatedAt;
     private List<InboundDetail> details;
+    private List<Barcode> barcodes;
 
     /**
-     * 从 InboundOrder 实体构造 VO。
+     * 从 InboundOrder 实体构造 VO（含明细行与条码列表）。
      */
-    public static InboundOrderVO from(InboundOrder order, List<InboundDetail> details) {
+    public static InboundOrderVO from(InboundOrder order, List<InboundDetail> details, List<Barcode> barcodes) {
         InboundOrderVO vo = new InboundOrderVO();
         vo.setId(order.getId());
         vo.setOrderNo(order.getOrderNo());
@@ -33,6 +36,7 @@ public class InboundOrderVO {
         vo.setCreatedAt(order.getCreatedAt() != null ? order.getCreatedAt().toString() : null);
         vo.setUpdatedAt(order.getUpdatedAt() != null ? order.getUpdatedAt().toString() : null);
         vo.setDetails(details);
+        vo.setBarcodes(barcodes != null ? barcodes : Collections.emptyList());
         return vo;
     }
 
@@ -58,4 +62,7 @@ public class InboundOrderVO {
 
     public List<InboundDetail> getDetails() { return details; }
     public void setDetails(List<InboundDetail> details) { this.details = details; }
+
+    public List<Barcode> getBarcodes() { return barcodes; }
+    public void setBarcodes(List<Barcode> barcodes) { this.barcodes = barcodes; }
 }

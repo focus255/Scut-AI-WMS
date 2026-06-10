@@ -10,6 +10,7 @@ package com.smartwms.config;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.smartwms.entity.AiReport;
 import com.smartwms.entity.Appliance;
+import com.smartwms.entity.Barcode;
 import com.smartwms.entity.InboundDetail;
 import com.smartwms.entity.InboundOrder;
 import com.smartwms.entity.Inventory;
@@ -22,6 +23,7 @@ import com.smartwms.entity.User;
 import com.smartwms.entity.UserRole;
 import com.smartwms.mapper.AiReportMapper;
 import com.smartwms.mapper.ApplianceMapper;
+import com.smartwms.mapper.BarcodeMapper;
 import com.smartwms.mapper.InboundDetailMapper;
 import com.smartwms.mapper.InboundOrderMapper;
 import com.smartwms.mapper.InventoryMapper;
@@ -70,6 +72,7 @@ public class DataInitializer implements CommandLineRunner {
     private final AiReportMapper aiReportMapper;
     private final InboundOrderMapper inboundOrderMapper;
     private final InboundDetailMapper inboundDetailMapper;
+    private final BarcodeMapper barcodeMapper;
 
     public DataInitializer(UserMapper userMapper,
                            RoleMapper roleMapper,
@@ -83,7 +86,8 @@ public class DataInitializer implements CommandLineRunner {
                            InventoryMapper inventoryMapper,
                            AiReportMapper aiReportMapper,
                            InboundOrderMapper inboundOrderMapper,
-                           InboundDetailMapper inboundDetailMapper) {
+                           InboundDetailMapper inboundDetailMapper,
+                           BarcodeMapper barcodeMapper) {
         this.userMapper = userMapper;
         this.roleMapper = roleMapper;
         this.permissionMapper = permissionMapper;
@@ -97,6 +101,7 @@ public class DataInitializer implements CommandLineRunner {
         this.aiReportMapper = aiReportMapper;
         this.inboundOrderMapper = inboundOrderMapper;
         this.inboundDetailMapper = inboundDetailMapper;
+        this.barcodeMapper = barcodeMapper;
     }
 
     @Override
@@ -435,7 +440,7 @@ public class DataInitializer implements CommandLineRunner {
         // 已完成入库单
         if (inboundOrderMapper.selectCount(null) == 0) {
             InboundOrder order1 = new InboundOrder();
-            order1.setOrderNo("RK" + today + "001");
+            order1.setOrderNo("RK" + today + "S001");
             order1.setStatus("已完成");
             order1.setSupplierCode("SUP_VWG_09");
             order1.setCreatedAt(now.minusHours(5));
@@ -449,9 +454,11 @@ public class DataInitializer implements CommandLineRunner {
             detail1.setPlanQty(200);
             detail1.setActualQty(200);
             inboundDetailMapper.insert(detail1);
+            // 生成条码（已完成 → "在库"）
+            seedBarcodes(order1, detail1, "在库");
 
             InboundOrder order2 = new InboundOrder();
-            order2.setOrderNo("RK" + today + "002");
+            order2.setOrderNo("RK" + today + "S002");
             order2.setStatus("未入库");
             order2.setSupplierCode("SUP_BOSCH_01");
             order2.setCreatedAt(now.minusHours(1));
@@ -465,9 +472,11 @@ public class DataInitializer implements CommandLineRunner {
             detail2.setPlanQty(150);
             detail2.setActualQty(0);
             inboundDetailMapper.insert(detail2);
+            // 生成条码（未入库 → "待入库"）
+            seedBarcodes(order2, detail2, "待入库");
 
             InboundOrder order3 = new InboundOrder();
-            order3.setOrderNo("RK" + today + "003");
+            order3.setOrderNo("RK" + today + "S003");
             order3.setStatus("已完成");
             order3.setSupplierCode("SUP_DENSO_05");
             order3.setCreatedAt(now.minusDays(1));
@@ -481,8 +490,34 @@ public class DataInitializer implements CommandLineRunner {
             detail3.setPlanQty(120);
             detail3.setActualQty(120);
             inboundDetailMapper.insert(detail3);
+            // 生成条码（已完成 → "在库"）
+            seedBarcodes(order3, detail3, "在库");
 
-            log.info("[初始化] 创建 3 条入库单（2 已完成 + 1 未入库）");
+            log.info("[初始化] 创建 3 条入库单（2 已完成 + 1 未入库），含条码");
+        }
+    }
+
+    /**
+     * 为一条入库明细生成条码记录。
+     * 逻辑与 InboundServiceImpl.create() 一致：按箱数拆分。
+     */
+    private void seedBarcodes(InboundOrder order, InboundDetail detail, String status) {
+        int boxCount = (int) Math.ceil((double) detail.getPlanQty() / detail.getPackCapacity());
+        for (int i = 0; i < boxCount; i++) {
+            Barcode bc = new Barcode();
+            bc.setMaterialCode(detail.getMaterialCode());
+            bc.setSupplierCode(order.getSupplierCode());
+            // 格式: WMS|物料|供应商|计划数|箱容量|实收数|箱号
+            bc.setBarcode(String.format("WMS|%s|%s|%d|%d|%d|%d",
+                    detail.getMaterialCode(),
+                    order.getSupplierCode(),
+                    detail.getPlanQty(),
+                    detail.getPackCapacity(),
+                    detail.getPlanQty(),
+                    i + 1));
+            bc.setStatus(status);
+            bc.setInboundId(order.getId());
+            barcodeMapper.insert(bc);
         }
     }
 

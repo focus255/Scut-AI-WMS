@@ -31,7 +31,7 @@
             <el-pagination
               v-if="materialTotal > 10"
               :current-page="materialPage" :page-size="10" :total="materialTotal"
-              layout="total, prev, pager, next" small
+              layout="total, prev, pager, next" size="small"
               @current-change="loadMaterials" />
           </div>
         </el-tab-pane>
@@ -62,7 +62,7 @@
             <el-pagination
               v-if="applianceTotal > 10"
               :current-page="appliancePage" :page-size="10" :total="applianceTotal"
-              layout="total, prev, pager, next" small
+              layout="total, prev, pager, next" size="small"
               @current-change="loadAppliances" />
           </div>
         </el-tab-pane>
@@ -93,7 +93,7 @@
             <el-pagination
               v-if="supplierTotal > 10"
               :current-page="supplierPage" :page-size="10" :total="supplierTotal"
-              layout="total, prev, pager, next" small
+              layout="total, prev, pager, next" size="small"
               @current-change="loadSuppliers" />
           </div>
         </el-tab-pane>
@@ -229,6 +229,7 @@
  */
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Plus, WarningFilled } from '@element-plus/icons-vue'
 import { getMaterials, createMaterial, updateMaterial, deleteMaterial } from '@/api/materials'
 import { getSuppliers, createSupplier, updateSupplier, deleteSupplier } from '@/api/suppliers'
 import { getAppliances, createAppliance, updateAppliance, deleteAppliance } from '@/api/appliances'

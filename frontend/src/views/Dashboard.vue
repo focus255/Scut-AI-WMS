@@ -37,16 +37,24 @@
     <div class="content-block scan-block">
       <div class="block-header">
         <span class="block-title">扫码入库</span>
-        <span class="scan-hint">扫描条码或手动输入后按回车确认</span>
       </div>
-      <div class="scan-input-area">
-        <el-input ref="scanInputRef" v-model="scanCode" placeholder="扫描或输入条码，按回车确认入库"
+      <div class="scan-row">
+        <el-input ref="scanInputRef" v-model="scanCode"
+          placeholder="输入条码号，或使用右侧按钮扫码/上传"
           size="large" clearable @keyup.enter="handleScanInbound"
-          :loading="scanLoading">
+          :loading="scanLoading" class="scan-input">
           <template #prefix>
             <el-icon :size="18"><Search /></el-icon>
           </template>
         </el-input>
+        <el-button size="large" @click="scannerRef?.openCamera()">
+          <el-icon :size="18"><Camera /></el-icon>
+          <span>摄像头扫码</span>
+        </el-button>
+        <el-button size="large" @click="scannerRef?.openUpload()">
+          <el-icon :size="18"><Upload /></el-icon>
+          <span>上传图片</span>
+        </el-button>
       </div>
       <div v-if="scanResult" class="scan-result">
         <div class="qr-row">
@@ -82,6 +90,9 @@
       </div>
     </div>
 
+    <!-- 条码扫描组件（摄像头 + 上传图片） -->
+    <BarcodeScanner ref="scannerRef" @scanned="onBarcodeScanned" />
+
     <!-- 双栏工作区 -->
     <div class="work-area">
       <!-- 左栏：库存水位分布 -->
@@ -89,7 +100,7 @@
         <div class="block-header">
           <span class="block-title">库存水位分布</span>
           <el-input v-model="searchKeyword" placeholder="搜索物料" clearable size="small"
-            style="width: 220px" @input="filterTable" />
+            style="width: 220px" />
         </div>
         <el-table :data="filteredData" stripe size="small">
           <el-table-column prop="materialCode" label="物料号" width="130" />
@@ -174,7 +185,8 @@ import { getStockReport } from '@/api/stock'
 import { getLatestReport, triggerPredict } from '@/api/ai'
 import { scanInbound } from '@/api/inbound'
 import { ElMessage } from 'element-plus'
-import { Search, WarningFilled } from '@element-plus/icons-vue'
+import { Search, WarningFilled, Camera, Upload } from '@element-plus/icons-vue'
+import BarcodeScanner from '@/components/BarcodeScanner.vue'
 
 // 统计
 const stats = reactive({ totalSku: 0, deadStockCount: 0, highRiskCount: 0 })
@@ -204,6 +216,12 @@ const scanCode = ref('')
 const scanLoading = ref(false)
 const scanResult = ref(null)
 const scanError = ref('')
+const scannerRef = ref(null)
+
+function onBarcodeScanned(code) {
+  scanCode.value = code
+  nextTick(() => handleScanInbound())
+}
 
 onMounted(() => {
   loadData()
@@ -223,8 +241,6 @@ async function loadData() {
     lastUpdateTime.value = new Date().toLocaleTimeString('zh-CN')
   } catch { /* 后端未就绪 */ }
 }
-
-function filterTable() { /* computed 自动处理 */ }
 
 async function handleQuickSearch() {
   if (!quickCode.value.trim()) return
@@ -369,16 +385,14 @@ function riskLabel(v) {
 .badge-default { background: #f4f4f5; color: #909399; }
 
 /* ==================== 扫码入库 ==================== */
-.scan-block {
-  margin-bottom: 16px;
+.scan-block { margin-bottom: 16px; }
+.scan-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
-.scan-hint {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.scan-input-area {
-  max-width: 600px;
-}
+.scan-input { flex: 1; min-width: 280px; }
 .scan-result {
   margin-top: 12px;
   padding: 12px;
@@ -420,8 +434,7 @@ function riskLabel(v) {
   .admin-header,
   .stat-tip,
   .work-right,
-  .scan-block,
-  .scan-hint {
+  .scan-block {
     display: none !important;
   }
   .admin-content {

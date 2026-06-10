@@ -105,6 +105,7 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { DataAnalysis, Document, Switch, TrendCharts, Cpu, Search, DArrowLeft, DArrowRight, UserFilled, WarningFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

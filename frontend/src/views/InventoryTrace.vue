@@ -24,7 +24,14 @@
       </div>
       <el-table :data="traceData" stripe size="small" v-loading="loading"
         empty-text="暂无追溯数据，请尝试修改查询条件">
-        <el-table-column prop="barcode" label="条码号" min-width="220" show-overflow-tooltip />
+        <el-table-column label="条码号" min-width="280">
+          <template #default="{ row }">
+            <div class="trace-barcode-cell">
+              <QRCode :value="row.barcode" :height="32" :display-value="false" />
+              <span class="trace-barcode-text">{{ row.barcode }}</span>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="materialCode" label="物料号" width="130" />
         <el-table-column prop="supplierCode" label="供应商" width="150" show-overflow-tooltip />
         <el-table-column prop="orderNo" label="入库单号" width="200" show-overflow-tooltip />
@@ -60,6 +67,7 @@
 import { ref, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getInventoryTrace } from '@/api/inbound'
+import QRCode from '@/components/QRCode.vue'
 
 const loading = ref(false)
 const traceData = ref([])
@@ -116,4 +124,19 @@ function statusBadgeClass(status) {
 .badge-success { background: #f0f9eb; color: #67c23a; }
 .badge-warn    { background: #fdf6ec; color: #e6a23c; }
 .badge-default { background: #f4f4f5; color: #909399; }
+.trace-barcode-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 4px 0;
+}
+.trace-barcode-cell :deep(canvas) {
+  max-width: 200px;
+}
+.trace-barcode-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
 </style>
