@@ -23,8 +23,63 @@
       <div class="stat-tip">
         <span>最后更新：{{ lastUpdateTime }}</span>
         <el-button text size="small" @click="loadData">刷新数据</el-button>
+        <el-button text size="small" @click="doPrintDashboard">打印看板</el-button>
       </div>
     </div>
+
+    <!-- 打印专用标题（仅打印时显示） -->
+    <div class="print-only-header">
+      <h2>智库 WMS — 库存看板</h2>
+      <span>打印时间：{{ new Date().toLocaleString('zh-CN') }}</span>
+    </div>
+
+    <!-- 扫码入库快捷入口 -->
+    <div class="content-block scan-block">
+      <div class="block-header">
+        <span class="block-title">扫码入库</span>
+      </div>
+      <div class="scan-row">
+        <el-button size="large" @click="scannerRef?.openCamera()">
+          <el-icon :size="18"><Camera /></el-icon>
+          <span>摄像头扫码</span>
+        </el-button>
+        <el-button size="large" @click="scannerRef?.openUpload()">
+          <el-icon :size="18"><Upload /></el-icon>
+          <span>上传图片</span>
+        </el-button>
+      </div>
+      <div v-if="scanResult" class="scan-result">
+        <div class="qr-row">
+          <span class="qr-label">物料号</span>
+          <span class="qr-value">{{ scanResult.materialCode }}</span>
+        </div>
+        <div class="qr-row">
+          <span class="qr-label">供应商</span>
+          <span class="qr-value">{{ scanResult.supplierCode }}</span>
+        </div>
+        <div class="qr-row">
+          <span class="qr-label">入库单号</span>
+          <span class="qr-value">{{ scanResult.orderNo }}</span>
+        </div>
+        <div class="qr-row">
+          <span class="qr-label">状态</span>
+          <span class="badge badge-success">已确认入库</span>
+        </div>
+      </div>
+      <div v-if="scanError" class="scan-error">
+        <el-icon :size="16"><WarningFilled /></el-icon>
+        <span>{{ scanError }}</span>
+      </div>
+      <div style="margin-top: 10px">
+        <el-button type="primary" link size="small" @click="$router.push('/inventory-trace')">
+          <el-icon :size="14"><Search /></el-icon>
+          库存追溯查询
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 条码扫描组件（摄像头 + 上传图片） -->
+    <BarcodeScanner ref="scannerRef" @scanned="onBarcodeScanned" />
 
     <!-- 双栏工作区 -->
     <div class="work-area">
@@ -33,7 +88,7 @@
         <div class="block-header">
           <span class="block-title">库存水位分布</span>
           <el-input v-model="searchKeyword" placeholder="搜索物料" clearable size="small"
-            style="width: 220px" @input="filterTable" />
+            style="width: 220px" />
         </div>
         <el-table :data="filteredData" stripe size="small">
           <el-table-column prop="materialCode" label="物料号" width="130" />
@@ -111,12 +166,15 @@
 
 <script setup>
 /**
- * 智能看板 — 统计概览 + 库存水位 + AI 速查。
+ * 智能看板 — 统计概览 + 库存水位 + AI 速查 + 扫码入库。
  */
 import { ref, reactive, computed, onMounted } from 'vue'
 import { getStockReport } from '@/api/stock'
 import { getLatestReport, triggerPredict } from '@/api/ai'
+import { scanInbound } from '@/api/inbound'
 import { ElMessage } from 'element-plus'
+import { WarningFilled, Camera, Upload } from '@element-plus/icons-vue'
+import BarcodeScanner from '@/components/BarcodeScanner.vue'
 
 // 统计
 const stats = reactive({ totalSku: 0, deadStockCount: 0, highRiskCount: 0 })
@@ -140,7 +198,29 @@ const quickLoading = ref(false)
 const quickResult = ref(null)
 const quickSearched = ref(false)
 
-onMounted(() => loadData())
+// ==================== 扫码入库 ====================
+const scanLoading = ref(false)
+const scanResult = ref(null)
+const scanError = ref('')
+const scannerRef = ref(null)
+
+async function onBarcodeScanned(code) {
+  scanLoading.value = true
+  scanResult.value = null
+  scanError.value = ''
+  try {
+    const data = await scanInbound({ barcode: code })
+    scanResult.value = data
+    ElMessage.success(`入库成功：${data.materialCode}`)
+    loadData()
+  } catch (err) {
+    scanError.value = err.message || '入库失败'
+  } finally { scanLoading.value = false }
+}
+
+onMounted(() => {
+  loadData()
+})
 
 async function loadData() {
   try {
@@ -152,8 +232,6 @@ async function loadData() {
     lastUpdateTime.value = new Date().toLocaleTimeString('zh-CN')
   } catch { /* 后端未就绪 */ }
 }
-
-function filterTable() { /* computed 自动处理 */ }
 
 async function handleQuickSearch() {
   if (!quickCode.value.trim()) return
@@ -175,6 +253,11 @@ async function handleTriggerPredict() {
   } catch {
     ElMessage.error('启动失败')
   }
+}
+
+// ==================== 打印看板 ====================
+function doPrintDashboard() {
+  window.print()
 }
 
 // ---- 辅助函数 ----
@@ -264,4 +347,91 @@ function riskLabel(v) {
 .badge-warn    { background: #fdf6ec; color: #e6a23c; }
 .badge-danger  { background: #fef0f0; color: #f56c6c; }
 .badge-default { background: #f4f4f5; color: #909399; }
+
+/* ==================== 扫码入库 ==================== */
+.scan-block { margin-bottom: 16px; }
+.scan-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.scan-result {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f0f9eb;
+  border-radius: 4px;
+  border: 1px solid #e1f3d8;
+}
+.scan-error {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: #fef0f0;
+  border-radius: 4px;
+  color: #f56c6c;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ==================== 打印专用 ==================== */
+.print-only-header {
+  display: none;
+}
+.print-only-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.print-only-header span {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+@media print {
+  body {
+    background: white !important;
+  }
+  .admin-sidebar,
+  .admin-header,
+  .stat-tip,
+  .work-right,
+  .scan-block {
+    display: none !important;
+  }
+  .admin-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+  .page-container {
+    padding: 10px !important;
+  }
+  .content-block {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    break-inside: avoid;
+  }
+  .stat-row {
+    break-inside: avoid;
+    border: 1px solid #ccc;
+    padding: 12px;
+  }
+  .work-area {
+    flex-direction: column !important;
+  }
+  .work-left {
+    width: 100% !important;
+  }
+  .print-only-header {
+    display: block;
+    text-align: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #333;
+  }
+  .badge {
+    border: 1px solid #999 !important;
+  }
+}
 </style>

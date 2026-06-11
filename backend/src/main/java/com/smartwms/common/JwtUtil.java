@@ -1,5 +1,6 @@
 /**
  * JWT 令牌工具类，负责令牌的生成与解析校验。
+ * 密钥和过期时间由 JwtConfig 在启动时注入，支持通过 application.yml 或环境变量外部化配置。
  *
  * @author Focus
  * @date 2026-06-03
@@ -19,22 +20,48 @@ import java.util.List;
 
 public class JwtUtil {
 
-    /**
-     * JWT 签名密钥（生产环境应从外部配置注入）。
-     */
-    private static final String SECRET = "smart-wms-jwt-secret-key-2026-must-be-at-least-256-bits!!";
-    private static final SecretKey SECRET_KEY = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+    /** 默认密钥（开发环境使用，生产环境由 JwtConfig 注入覆盖） */
+    private static String secret = "smart-wms-jwt-secret-key-2026-must-be-at-least-256-bits!!";
+    private static volatile SecretKey secretKey = buildKey(secret);
 
-    /** 令牌有效期：2 小时（毫秒） */
-    private static final long EXPIRATION_MS = 2 * 60 * 60 * 1000L;
+    /** 令牌有效期：默认 2 小时（毫秒） */
+    private static long expirationMs = 2 * 60 * 60 * 1000L;
+
     private static final String CLAIM_USERNAME = "username";
     private static final String CLAIM_ROLES = "roles";
 
     private JwtUtil() {}
 
+    /**
+     * 由 JwtConfig 在启动时调用，注入外部化配置的密钥。
+     *
+     * @param newSecret 新密钥字符串
+     */
+    public static void setSecret(String newSecret) {
+        if (newSecret != null && !newSecret.isEmpty()) {
+            secret = newSecret;
+            secretKey = buildKey(newSecret);
+        }
+    }
+
+    /**
+     * 由 JwtConfig 在启动时调用，注入外部化配置的过期时间。
+     *
+     * @param ms 过期时间（毫秒）
+     */
+    public static void setExpirationMs(long ms) {
+        if (ms > 0) {
+            expirationMs = ms;
+        }
+    }
+
+    private static SecretKey buildKey(String key) {
+        return Keys.hmacShaKeyFor(key.getBytes(StandardCharsets.UTF_8));
+    }
+
     public static String generateToken(Long userId, String username, List<String> roles) {
         Date now = new Date();
-        Date expiration = new Date(now.getTime() + EXPIRATION_MS);
+        Date expiration = new Date(now.getTime() + expirationMs);
 
         return Jwts.builder()
                 .subject(String.valueOf(userId))
@@ -42,13 +69,13 @@ public class JwtUtil {
                 .claim(CLAIM_ROLES, roles)
                 .issuedAt(now)
                 .expiration(expiration)
-                .signWith(SECRET_KEY)
+                .signWith(secretKey)
                 .compact();
     }
 
     public static Claims parseToken(String token) throws JwtException {
         return Jwts.parser()
-                .verifyWith(SECRET_KEY)
+                .verifyWith(secretKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
@@ -72,6 +99,6 @@ public class JwtUtil {
     }
 
     public static long getExpirationMs() {
-        return EXPIRATION_MS;
+        return expirationMs;
     }
 }

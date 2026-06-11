@@ -1,0 +1,26 @@
+# ===================================================================
+# 开发环境配置 — H2 内存数据库，无需外部依赖即可启动
+# @author Focus
+# @date 2026-06-10
+# ===================================================================
+
+spring:
+  datasource:
+    # H2 内存数据库，MySQL 兼容模式
+    url: jdbc:h2:mem:smart_wms_db;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  # H2 Web 控制台（仅开发环境，浏览器访问 /h2-console）
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # 每次启动执行建表脚本 + DataInitializer 插入种子数据
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/init_script.sql
+      encoding: UTF-8
