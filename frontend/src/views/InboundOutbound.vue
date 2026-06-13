@@ -191,23 +191,24 @@
           <el-table-column prop="planQty" label="计划数" width="80" align="right" />
           <el-table-column prop="actualQty" label="实收数" width="80" align="right" />
         </el-table>
-        <!-- 条码图形展示（每行独占，可点击下载） -->
+        <!-- 箱单标签展示（点击可下载完整标签 PNG） -->
         <div v-if="detailData && detailData.barcodes && detailData.barcodes.length > 0"
           class="barcode-gallery">
-          <div class="barcode-gallery-title">二维码（共 {{ detailData.barcodes.length }} 个，点击可下载 PNG）</div>
-          <div class="barcode-list-vertical">
-            <div v-for="bc in detailData.barcodes" :key="bc.barcode" class="barcode-row"
-              @click="downloadBarcode(bc, $event)">
-              <div class="barcode-row-header">
-                <span class="barcode-row-label">{{ bc.barcode }}</span>
+          <div class="barcode-gallery-title">箱单标签（共 {{ detailData.barcodes.length }} 个，点击可下载完整标签）</div>
+          <div class="label-grid">
+            <div v-for="bc in detailData.barcodes" :key="bc.barcode" class="label-card"
+              @click="downloadLabel(bc, $event)">
+              <div class="label-card-header">
                 <span class="barcode-status-tag" :class="bc.status === '在库' ? 'tag-in-stock' : 'tag-pending'">
                   {{ bc.status }}
                 </span>
                 <el-icon :size="14" class="download-icon"><Download /></el-icon>
               </div>
-              <div class="barcode-row-image" :ref="el => setBarcodeRef(bc.barcode, el)">
-                <QRCode :value="bc.barcode" :height="60" :display-value="false" />
-              </div>
+              <BoxLabel :ref="el => setLabelRef(bc.barcode, el)"
+                :barcode="bc.barcode"
+                :status="bc.status"
+                :order-no="detailData.orderNo"
+                :created-at="bc.createdAt" />
             </div>
           </div>
         </div>
@@ -300,14 +301,16 @@
                 </tr>
               </tbody>
             </table>
-            <!-- 条码图形 -->
+            <!-- 箱单标签 -->
             <div v-if="printOrder.barcodes && printOrder.barcodes.length > 0"
-              class="print-barcodes">
-              <div class="barcode-gallery-title">条码标签</div>
-              <div class="barcode-list">
-                <div v-for="bc in printOrder.barcodes" :key="bc.barcode" class="barcode-item">
-                  <QRCode :value="bc.barcode" :height="40" />
-                  <span style="font-size: 11px;">{{ bc.status }}</span>
+              class="print-labels">
+              <div class="barcode-gallery-title">箱单标签（共 {{ printOrder.barcodes.length }} 个）</div>
+              <div class="label-print-grid">
+                <div v-for="bc in printOrder.barcodes" :key="bc.barcode" class="label-print-item">
+                  <BoxLabel :barcode="bc.barcode"
+                    :status="bc.status"
+                    :order-no="printOrder.orderNo"
+                    :created-at="bc.createdAt" />
                 </div>
               </div>
             </div>
@@ -339,6 +342,7 @@ import { getSuppliers } from '@/api/suppliers'
 import { getMaterials } from '@/api/materials'
 import { useUserStore } from '@/stores/user'
 import QRCode from '@/components/QRCode.vue'
+import BoxLabel from '@/components/BoxLabel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -597,36 +601,46 @@ async function handleEditSubmit() {
   }
 }
 
-// ==================== 条码下载 ====================
-/** 存储每个条码的 DOM 引用，用于导出图片 */
-const barcodeRefs = {}
+// ==================== 标签下载 ====================
+/** 存储每个标签组件的引用，用于导出完整标签图片 */
+const labelRefs = {}
 
-function setBarcodeRef(barcode, el) {
-  if (el) barcodeRefs[barcode] = el
+function setLabelRef(barcode, el) {
+  if (el) labelRefs[barcode] = el
 }
 
 /**
- * 下载二维码 PNG 位图。
+ * 从条码字符串中提取用于文件名的物料编码和箱号。
  */
-function downloadBarcode(bc, event) {
+function parseBarcodeForFilename(str) {
+  const parts = (str || '').split('|')
+  return {
+    materialCode: parts[1] || 'UNKNOWN',
+    boxSeq: parts[6] || '1',
+  }
+}
+
+/**
+ * 下载完整箱单标签 PNG 图片。
+ */
+function downloadLabel(bc, event) {
   event.stopPropagation()
-  const wrapper = barcodeRefs[bc.barcode]
-  if (!wrapper) return
-  const canvas = wrapper.querySelector('canvas')
+  const component = labelRefs[bc.barcode]
+  if (!component) return
+  const canvas = component.getCanvas()
   if (!canvas) return
 
-  // 直接导出为 PNG 位图
-  const sanitized = bc.barcode.replace(/\|/g, '-')
+  const info = parseBarcodeForFilename(bc.barcode)
   canvas.toBlob((blob) => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${sanitized}.png`
+    a.download = `${info.materialCode}_箱${info.boxSeq}.png`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-    ElMessage.success('二维码已下载')
+    ElMessage.success('标签已下载')
   }, 'image/png')
 }
 
@@ -668,6 +682,12 @@ function doPrint() {
       table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
       th, td { border: 1px solid #333; padding: 6px 10px; text-align: left; font-size: 14px; }
       th { background: #e0e0e0; }
+      .print-labels { margin-top: 16px; padding-top: 12px; border-top: 1px solid #ccc; }
+      .barcode-gallery-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+      .label-print-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      .label-print-item { display: flex; justify-content: center; page-break-inside: avoid; }
+      .label-print-item canvas { max-width: 100%; height: auto; }
+      .box-label-canvas { box-shadow: none !important; }
       .print-footer { display: flex; justify-content: space-between;
         font-size: 12px; color: #666; margin-top: 20px; padding-top: 12px; border-top: 1px solid #ccc; }
       @media print { body { padding: 0; } }
@@ -842,7 +862,7 @@ function doPrint() {
 .badge-success { background: #f0f9eb; color: #67c23a; }
 .badge-default { background: #f4f4f5; color: #909399; }
 
-/* ==================== 条码画廊（竖排，可点击下载） ==================== */
+/* ==================== 标签画廊（网格布局，可点击下载） ==================== */
 .barcode-gallery {
   margin-top: 16px;
   padding-top: 12px;
@@ -854,53 +874,42 @@ function doPrint() {
   color: var(--text-primary);
   margin-bottom: 12px;
 }
-.barcode-list-vertical {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 500px;
+/* 使用网格布局适配长方形标签 */
+.label-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  max-height: 560px;
   overflow-y: auto;
 }
-.barcode-row {
+.label-card {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 10px 14px;
+  padding: 10px 10px 6px;
   background: #fff;
   border: 1px solid var(--border-light);
   border-radius: 4px;
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-.barcode-row:hover {
+.label-card:hover {
   border-color: var(--wms-primary);
-  box-shadow: 0 1px 6px rgba(64, 158, 255, 0.15);
+  box-shadow: 0 1px 8px rgba(64, 158, 255, 0.18);
 }
-.barcode-row-header {
+.label-card-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-}
-.barcode-row-label {
-  font-size: 12px;
-  font-family: 'Courier New', monospace;
-  color: var(--text-regular);
-  flex: 1;
+  padding: 0 2px;
 }
 .download-icon {
   color: var(--text-secondary);
   flex-shrink: 0;
 }
-.barcode-row:hover .download-icon {
+.label-card:hover .download-icon {
   color: var(--wms-primary);
-}
-.barcode-row-image {
-  display: flex;
-  justify-content: center;
-  padding: 4px 0;
-}
-.barcode-row-image :deep(canvas) {
-  max-width: 100%;
 }
 .barcode-status-tag {
   font-size: 11px;
@@ -954,6 +963,31 @@ function doPrint() {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--border-light);
+}
+
+/* ==================== 打印预览 — 标签网格 ==================== */
+.print-labels {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+}
+.label-print-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.label-print-item {
+  display: flex;
+  justify-content: center;
+}
+.label-print-item :deep(.box-label-canvas) {
+  box-shadow: none;
+  border: 1px solid #ccc;
+}
+@media (max-width: 520px) {
+  .label-print-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ==================== 响应式 ==================== */
