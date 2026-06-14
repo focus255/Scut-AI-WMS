@@ -44,17 +44,20 @@ public class InboundServiceImpl implements InboundService {
     private final InventoryMapper inventoryMapper;
     private final BarcodeMapper barcodeMapper;
     private final MaterialMapper materialMapper;
+    private final OutboundHistoryMapper outboundHistoryMapper;
 
     public InboundServiceImpl(InboundOrderMapper inboundOrderMapper,
                                InboundDetailMapper inboundDetailMapper,
                                InventoryMapper inventoryMapper,
                                BarcodeMapper barcodeMapper,
-                               MaterialMapper materialMapper) {
+                               MaterialMapper materialMapper,
+                               OutboundHistoryMapper outboundHistoryMapper) {
         this.inboundOrderMapper = inboundOrderMapper;
         this.inboundDetailMapper = inboundDetailMapper;
         this.inventoryMapper = inventoryMapper;
         this.barcodeMapper = barcodeMapper;
         this.materialMapper = materialMapper;
+        this.outboundHistoryMapper = outboundHistoryMapper;
     }
 
     @Override
@@ -89,16 +92,11 @@ public class InboundServiceImpl implements InboundService {
             detail.setActualQty(0);
             inboundDetailMapper.insert(detail);
 
-            // 按箱数生成条码，格式: WMS|物料|供应商|计划数|箱容量|实收数|箱号
+            // 按箱数生成条码，追加入库单号保证跨批次唯一。
             int boxCount = (int) Math.ceil((double) item.getPlanQty() / item.getPackCapacity());
             for (int i = 0; i < boxCount; i++) {
-                String barcodeStr = String.format("WMS|%s|%s|%d|%d|%d|%d",
-                        item.getMaterialCode(),
-                        request.getSupplierCode(),
-                        item.getPlanQty(),
-                        item.getPackCapacity(),
-                        item.getPlanQty(),  // 实收数初始等于计划数（全量）
-                        i + 1);
+                String barcodeStr = buildBarcode(item.getMaterialCode(), request.getSupplierCode(), item.getPlanQty(),
+                        item.getPackCapacity(), item.getPlanQty(), i + 1, orderNo);
                 Barcode barcode = new Barcode();
                 barcode.setMaterialCode(item.getMaterialCode());
                 barcode.setSupplierCode(request.getSupplierCode());
@@ -244,13 +242,8 @@ public class InboundServiceImpl implements InboundService {
 
             int boxCount = (int) Math.ceil((double) item.getPlanQty() / item.getPackCapacity());
             for (int i = 0; i < boxCount; i++) {
-                String barcodeStr = String.format("WMS|%s|%s|%d|%d|%d|%d",
-                        item.getMaterialCode(),
-                        request.getSupplierCode(),
-                        item.getPlanQty(),
-                        item.getPackCapacity(),
-                        item.getPlanQty(),
-                        i + 1);
+                String barcodeStr = buildBarcode(item.getMaterialCode(), request.getSupplierCode(), item.getPlanQty(),
+                        item.getPackCapacity(), item.getPlanQty(), i + 1, orderNo);
                 Barcode barcode = new Barcode();
                 barcode.setMaterialCode(item.getMaterialCode());
                 barcode.setSupplierCode(request.getSupplierCode());
@@ -321,7 +314,7 @@ public class InboundServiceImpl implements InboundService {
             wrapper.eq(Barcode::getMaterialCode, materialCode);
         }
         if (hasBarcode) {
-            wrapper.like(Barcode::getBarcode, "%" + barcode + "%");
+            wrapper.eq(Barcode::getBarcode, barcode);
         }
         if (inboundId != null) {
             wrapper.eq(Barcode::getInboundId, inboundId);
@@ -342,7 +335,13 @@ public class InboundServiceImpl implements InboundService {
                                 .eq(InboundDetail::getMaterialCode, bc.getMaterialCode())
                 );
             }
-            items.add(InventoryTraceVO.TraceItem.from(bc, detail));
+            OutboundHistory outboundHistory = outboundHistoryMapper.selectOne(
+                    new LambdaQueryWrapper<OutboundHistory>()
+                            .eq(OutboundHistory::getBarcodeId, bc.getId())
+                            .orderByDesc(OutboundHistory::getCreatedAt)
+                            .last("limit 1")
+            );
+            items.add(InventoryTraceVO.TraceItem.from(bc, detail, outboundHistory));
         }
 
         return InventoryTraceVO.of(items);
@@ -458,6 +457,23 @@ public class InboundServiceImpl implements InboundService {
         barcodeMapper.insert(barcode);
 
         return barcode;
+    }
+
+    private String buildBarcode(String materialCode,
+                                String supplierCode,
+                                int planQty,
+                                int packCapacity,
+                                int actualQty,
+                                int boxNo,
+                                String orderNo) {
+        return String.format("WMS|%s|%s|%d|%d|%d|%d|%s",
+                materialCode,
+                supplierCode,
+                planQty,
+                packCapacity,
+                actualQty,
+                boxNo,
+                orderNo);
     }
 
     private int parseIntSafe(String s, int defaultVal) {

@@ -143,7 +143,23 @@ CREATE TABLE IF NOT EXISTS `outbound_details` (
   `created_at`    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 14. 物料器具条码追踪表
+-- 14. 出库批次流水表
+CREATE TABLE IF NOT EXISTS `outbound_histories` (
+  `id`                 BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+  `outbound_id`        BIGINT NOT NULL COMMENT '出库单主表ID',
+  `outbound_order_no`  VARCHAR(100) NOT NULL COMMENT '出库单号',
+  `outbound_detail_id` BIGINT NOT NULL COMMENT '出库明细ID',
+  `material_code`      VARCHAR(100) NOT NULL COMMENT '物料号',
+  `inbound_id`         BIGINT NOT NULL COMMENT '来源入库单主表ID',
+  `inbound_order_no`   VARCHAR(100) NOT NULL COMMENT '来源入库单号',
+  `inbound_detail_id`  BIGINT NOT NULL COMMENT '来源入库明细ID',
+  `barcode_id`         BIGINT NOT NULL COMMENT '实际出库条码ID',
+  `barcode`            VARCHAR(150) NOT NULL COMMENT '实际出库条码号',
+  `deduct_qty`         INT NOT NULL COMMENT '本次扣减数量',
+  `created_at`         DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 15. 物料器具条码追踪表
 CREATE TABLE IF NOT EXISTS `barcodes` (
   `id`            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
   `material_code` VARCHAR(100) NOT NULL COMMENT '零件编码',
@@ -155,7 +171,7 @@ CREATE TABLE IF NOT EXISTS `barcodes` (
   `updated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- 15. AI库存推演与智能决策报告表
+-- 16. AI库存推演与智能决策报告表
 CREATE TABLE IF NOT EXISTS `ai_inventory_reports` (
   `id`                       BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键报告ID',
   `material_code`            VARCHAR(100) NOT NULL COMMENT '预测目标物料号',

@@ -8,6 +8,7 @@ package com.smartwms.dto;
 
 import com.smartwms.entity.Barcode;
 import com.smartwms.entity.InboundDetail;
+import com.smartwms.entity.OutboundHistory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,13 +47,15 @@ public class InventoryTraceVO {
         private Integer planQty;
         private Integer actualQty;
         private String inboundCreatedAt;
+        private String outboundOrderNo;
+        private String outboundAt;
         private String barcodeCreatedAt;
         private String barcodeUpdatedAt;
 
         /**
          * 从条码和入库明细组装追溯条目。
          */
-        public static TraceItem from(Barcode bc, InboundDetail detail) {
+        public static TraceItem from(Barcode bc, InboundDetail detail, OutboundHistory outboundHistory) {
             TraceItem item = new TraceItem();
             item.setBarcode(bc.getBarcode());
             item.setMaterialCode(bc.getMaterialCode());
@@ -66,6 +69,10 @@ public class InventoryTraceVO {
                 item.setPlanQty(detail.getPlanQty());
                 item.setActualQty(detail.getActualQty());
                 item.setInboundCreatedAt(detail.getCreatedAt() != null ? detail.getCreatedAt().toString() : null);
+            }
+            if (outboundHistory != null) {
+                item.setOutboundOrderNo(outboundHistory.getOutboundOrderNo());
+                item.setOutboundAt(outboundHistory.getCreatedAt() != null ? outboundHistory.getCreatedAt().toString() : null);
             }
             return item;
         }
@@ -98,6 +105,12 @@ public class InventoryTraceVO {
 
         public String getInboundCreatedAt() { return inboundCreatedAt; }
         public void setInboundCreatedAt(String inboundCreatedAt) { this.inboundCreatedAt = inboundCreatedAt; }
+
+        public String getOutboundOrderNo() { return outboundOrderNo; }
+        public void setOutboundOrderNo(String outboundOrderNo) { this.outboundOrderNo = outboundOrderNo; }
+
+        public String getOutboundAt() { return outboundAt; }
+        public void setOutboundAt(String outboundAt) { this.outboundAt = outboundAt; }
 
         public String getBarcodeCreatedAt() { return barcodeCreatedAt; }
         public void setBarcodeCreatedAt(String barcodeCreatedAt) { this.barcodeCreatedAt = barcodeCreatedAt; }
