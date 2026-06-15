@@ -59,6 +59,12 @@ const routes = [
         name: 'InventoryTrace',
         component: () => import('@/views/InventoryTrace.vue'),
         meta: { title: '库存追溯' }
+      },
+      {
+        path: 'inbound-history',
+        name: 'InboundHistory',
+        component: () => import('@/views/InboundHistory.vue'),
+        meta: { title: '入库历史' }
       }
     ]
   },

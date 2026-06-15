@@ -15,6 +15,7 @@
             </el-button>
             <el-input v-model="materialKeyword" placeholder="搜索物料编码或名称"
               clearable size="small" style="width: 240px" @input="loadMaterials" />
+            <el-button size="small" @click="exportMaterials">导出 CSV</el-button>
           </div>
           <el-table :data="materialList" stripe size="small" v-loading="materialLoading">
             <el-table-column prop="materialCode" label="物料号" width="140" />
@@ -44,6 +45,7 @@
             </el-button>
             <el-input v-model="applianceKeyword" placeholder="搜索物料编码/供应商/型号"
               clearable size="small" style="width: 240px" @input="loadAppliances" />
+            <el-button size="small" @click="exportAppliances">导出 CSV</el-button>
           </div>
           <el-table :data="applianceList" stripe size="small" v-loading="applianceLoading">
             <el-table-column prop="materialCode" label="物料编码" width="140" />
@@ -75,6 +77,7 @@
             </el-button>
             <el-input v-model="supplierKeyword" placeholder="搜索供应商编码或名称"
               clearable size="small" style="width: 240px" @input="loadSuppliers" />
+            <el-button size="small" @click="exportSuppliers">导出 CSV</el-button>
           </div>
           <el-table :data="supplierList" stripe size="small" v-loading="supplierLoading">
             <el-table-column prop="supplierCode" label="供应商编码" width="160" />
@@ -233,6 +236,7 @@ import { Plus, WarningFilled } from '@element-plus/icons-vue'
 import { getMaterials, createMaterial, updateMaterial, deleteMaterial } from '@/api/materials'
 import { getSuppliers, createSupplier, updateSupplier, deleteSupplier } from '@/api/suppliers'
 import { getAppliances, createAppliance, updateAppliance, deleteAppliance } from '@/api/appliances'
+import { exportCSV } from '@/utils/export'
 
 const activeTab = ref('materials')
 
@@ -486,5 +490,38 @@ async function confirmApplianceDelete() {
     applianceDeleteTarget.value = null
     loadAppliances(appliancePage.value)
   } catch { /* */ }
+}
+
+// ==================== 导出 ====================
+function exportMaterials() {
+  if (!materialList.value.length) { ElMessage.warning('没有数据可导出'); return }
+  exportCSV([
+    { key: 'materialCode', label: '物料号' },
+    { key: 'materialName', label: '物料名称' },
+    { key: 'supplierCode', label: '默认供应商' }
+  ], materialList.value, `物料档案_${new Date().toISOString().substring(0, 10)}`)
+  ElMessage.success('导出成功')
+}
+function exportSuppliers() {
+  if (!supplierList.value.length) { ElMessage.warning('没有数据可导出'); return }
+  exportCSV([
+    { key: 'supplierCode', label: '供应商编码' },
+    { key: 'supplierName', label: '供应商名称' },
+    { key: 'contactName', label: '联系人' },
+    { key: 'contactPhone', label: '联系电话' },
+    { key: 'createdAt', label: '创建时间' }
+  ], supplierList.value, `供应商库_${new Date().toISOString().substring(0, 10)}`)
+  ElMessage.success('导出成功')
+}
+function exportAppliances() {
+  if (!applianceList.value.length) { ElMessage.warning('没有数据可导出'); return }
+  exportCSV([
+    { key: 'materialCode', label: '物料编码' },
+    { key: 'supplierCode', label: '供应商编码' },
+    { key: 'packType', label: '包装器具型号' },
+    { key: 'packCapacity', label: '单箱容量' },
+    { key: 'createdAt', label: '创建时间' }
+  ], applianceList.value, `器具配置_${new Date().toISOString().substring(0, 10)}`)
+  ElMessage.success('导出成功')
 }
 </script>

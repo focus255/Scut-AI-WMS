@@ -1,5 +1,5 @@
 <!--
-  智能库存看板首页 — 工作台风格。
+  智能库存看板首页 — 工作台风格（含图表 + 动态流 + 实时告警）。
   @author Focus
   @date 2026-06-03
 -->
@@ -27,10 +27,20 @@
       </div>
     </div>
 
-    <!-- 打印专用标题（仅打印时显示） -->
+    <!-- 打印专用标题 -->
     <div class="print-only-header">
       <h2>智库 WMS — 库存看板</h2>
       <span>打印时间：{{ new Date().toLocaleString('zh-CN') }}</span>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="chart-row">
+      <div class="chart-half">
+        <ChartCard title="库存水位分布" :height="260" :option="levelPieOption" />
+      </div>
+      <div class="chart-half">
+        <ChartCard title="库存量 Top 10" :height="260" :option="stockBarOption" />
+      </div>
     </div>
 
     <!-- 扫码入库快捷入口 -->
@@ -78,7 +88,6 @@
       </div>
     </div>
 
-    <!-- 条码扫描组件（摄像头 + 上传图片） -->
     <BarcodeScanner ref="scannerRef" @scanned="onBarcodeScanned" />
 
     <!-- 双栏工作区 -->
@@ -106,59 +115,42 @@
         </el-table>
       </div>
 
-      <!-- 右栏：AI 速查 -->
-      <div class="content-block work-right" style="width: 340px; flex-shrink: 0">
-        <div class="block-header">
-          <span class="block-title">AI 智能速查</span>
-        </div>
+      <!-- 右栏：AI 速查 + 最近动态 -->
+      <div class="content-block work-right" style="width: 360px; flex-shrink: 0">
+        <div class="block-header"><span class="block-title">AI 智能速查</span></div>
         <div style="display: flex; gap: 8px; margin-bottom: 16px">
           <el-input v-model="quickCode" placeholder="输入物料号" size="small" clearable />
-          <el-button type="primary" size="small" :loading="quickLoading" @click="handleQuickSearch">
-            查询
-          </el-button>
+          <el-button type="primary" size="small" :loading="quickLoading" @click="handleQuickSearch">查询</el-button>
         </div>
-
         <div v-if="quickResult" class="quick-result">
-          <div class="qr-row">
-            <span class="qr-label">物料</span>
-            <span class="qr-value">{{ quickResult.materialCode }}</span>
-          </div>
-          <div class="qr-row">
-            <span class="qr-label">快照库存</span>
-            <span class="qr-value">{{ quickResult.currentStock }} 件</span>
-          </div>
-          <div class="qr-row">
-            <span class="qr-label">风险类型</span>
-            <span class="badge" :class="'badge-' + badgeClass(quickResult.riskType)">
-              {{ riskLabel(quickResult.riskType) }}
-            </span>
-          </div>
-          <div class="qr-row">
-            <span class="qr-label">风险等级</span>
-            <span class="qr-value">{{ quickResult.riskLevel }}</span>
-          </div>
-          <div class="qr-row">
-            <span class="qr-label">建议补货</span>
-            <span class="qr-value" style="font-weight: 600; color: var(--wms-primary)">
-              {{ quickResult.suggestedQty }} 件
-            </span>
-          </div>
-          <div class="qr-row">
-            <span class="qr-label">置信度</span>
-            <span class="qr-value">{{ (quickResult.confidence * 100).toFixed(0) }}%</span>
-          </div>
+          <div class="qr-row"><span class="qr-label">物料</span><span class="qr-value">{{ quickResult.materialCode }}</span></div>
+          <div class="qr-row"><span class="qr-label">快照库存</span><span class="qr-value">{{ quickResult.currentStock }} 件</span></div>
+          <div class="qr-row"><span class="qr-label">风险类型</span><span class="badge" :class="'badge-' + badgeClass(quickResult.riskType)">{{ riskLabel(quickResult.riskType) }}</span></div>
+          <div class="qr-row"><span class="qr-label">风险等级</span><span class="qr-value">{{ quickResult.riskLevel }}</span></div>
+          <div class="qr-row"><span class="qr-label">建议补货</span><span class="qr-value" style="font-weight: 600; color: var(--wms-primary)">{{ quickResult.suggestedQty }} 件</span></div>
+          <div class="qr-row"><span class="qr-label">置信度</span><span class="qr-value">{{ (quickResult.confidence * 100).toFixed(0) }}%</span></div>
           <el-divider style="margin: 12px 0" />
           <p class="qr-advice">{{ quickResult.replenishmentSuggestion }}</p>
         </div>
         <div v-else-if="quickSearched" class="empty-hint">
           <p>暂无该物料的 AI 分析报告</p>
-          <el-button text type="primary" size="small" @click="handleTriggerPredict">
-            点击发起 AI 预测
-          </el-button>
+          <el-button text type="primary" size="small" @click="handleTriggerPredict">点击发起 AI 预测</el-button>
         </div>
-        <div v-else class="empty-hint">
-          <p>输入物料号查看 AI 智能分析结果</p>
+        <div v-else class="empty-hint"><p>输入物料号查看 AI 智能分析结果</p></div>
+
+        <!-- 最近动态 -->
+        <el-divider style="margin: 20px 0 12px" />
+        <div class="block-header" style="margin-bottom: 8px"><span class="block-title">最近动态</span></div>
+        <div v-if="recentActivity.length" class="activity-list">
+          <div v-for="(a, i) in recentActivity" :key="i" class="activity-item">
+            <span class="act-badge" :class="a.type === 'inbound' ? 'badge-success' : 'badge-warn'">
+              {{ a.type === 'inbound' ? '入库' : '出库' }}
+            </span>
+            <span class="act-text">{{ a.text }}</span>
+            <span class="act-time">{{ a.time }}</span>
+          </div>
         </div>
+        <div v-else class="empty-hint" style="padding: 20px 0"><p>暂无最近动态</p></div>
       </div>
     </div>
   </div>
@@ -166,60 +158,96 @@
 
 <script setup>
 /**
- * 智能看板 — 统计概览 + 库存水位 + AI 速查 + 扫码入库。
+ * 智能看板 — 统计概览 + 图表 + 库存水位 + AI 速查 + 扫码入库 + 动态流 + 实时告警。
  */
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { getStockReport } from '@/api/stock'
 import { getLatestReport, triggerPredict } from '@/api/ai'
-import { scanInbound } from '@/api/inbound'
-import { ElMessage } from 'element-plus'
+import { scanInbound, getInboundOrders } from '@/api/inbound'
+import { getOutboundOrders } from '@/api/outbound'
+import { ElMessage, ElNotification } from 'element-plus'
 import { WarningFilled, Camera, Upload } from '@element-plus/icons-vue'
 import BarcodeScanner from '@/components/BarcodeScanner.vue'
+import ChartCard from '@/components/ChartCard.vue'
 
-// 统计
 const stats = reactive({ totalSku: 0, deadStockCount: 0, highRiskCount: 0 })
 const lastUpdateTime = ref('—')
-
-// 左栏表格
 const stockData = ref([])
 const searchKeyword = ref('')
 const filteredData = computed(() => {
   if (!searchKeyword.value) return stockData.value
   const kw = searchKeyword.value.toLowerCase()
-  return stockData.value.filter(
-    r => r.materialCode?.toLowerCase().includes(kw) ||
-         r.materialName?.toLowerCase().includes(kw)
-  )
+  return stockData.value.filter(r => r.materialCode?.toLowerCase().includes(kw) || r.materialName?.toLowerCase().includes(kw))
 })
 
-// 右栏速查
+// AI 速查
 const quickCode = ref('')
 const quickLoading = ref(false)
 const quickResult = ref(null)
 const quickSearched = ref(false)
 
-// ==================== 扫码入库 ====================
-const scanLoading = ref(false)
+// 扫码入库
 const scanResult = ref(null)
 const scanError = ref('')
 const scannerRef = ref(null)
 
-async function onBarcodeScanned(code) {
-  scanLoading.value = true
-  scanResult.value = null
-  scanError.value = ''
-  try {
-    const data = await scanInbound({ barcode: code })
-    scanResult.value = data
-    ElMessage.success(`入库成功：${data.materialCode}`)
-    loadData()
-  } catch (err) {
-    scanError.value = err.message || '入库失败'
-  } finally { scanLoading.value = false }
-}
+// 最近动态
+const recentActivity = ref([])
+
+// 实时告警：记录上一次检测到的低储物料集合，用于去重
+let lastLowStockSet = new Set()
+let alertTimer = null
+
+// ==================== 图表配置 ====================
+const levelPieOption = computed(() => {
+  const counts = { NORMAL: 0, LOW_STOCK: 0, HIGH: 0, DEAD_STOCK: 0 }
+  stockData.value.forEach(r => { if (counts[r.ruleEvaluation] !== undefined) counts[r.ruleEvaluation]++ })
+  return {
+    tooltip: { trigger: 'item', formatter: '{b}: {c} 种 ({d}%)' },
+    legend: { bottom: 0, textStyle: { fontSize: 11 } },
+    series: [{
+      type: 'pie', radius: ['45%', '72%'], center: ['50%', '48%'],
+      label: { formatter: '{b}\n{d}%', fontSize: 11 },
+      data: [
+        { value: counts.NORMAL, name: '正常', itemStyle: { color: '#67c23a' } },
+        { value: counts.LOW_STOCK, name: '超低储', itemStyle: { color: '#f56c6c' } },
+        { value: counts.HIGH, name: '超高储', itemStyle: { color: '#e6a23c' } },
+        { value: counts.DEAD_STOCK, name: '滞销', itemStyle: { color: '#f0ad4e' } }
+      ]
+    }]
+  }
+})
+
+const stockBarOption = computed(() => {
+  const top10 = [...stockData.value].sort((a, b) => b.stockQty - a.stockQty).slice(0, 10)
+  return {
+    tooltip: { trigger: 'axis' },
+    grid: { left: 50, right: 20, top: 10, bottom: 50 },
+    xAxis: {
+      type: 'category', data: top10.map(r => r.materialCode?.substring(7) || ''),
+      axisLabel: { rotate: 45, fontSize: 10 }
+    },
+    yAxis: { type: 'value', name: '件' },
+    series: [{
+      type: 'bar', data: top10.map(r => r.stockQty),
+      itemStyle: {
+        borderRadius: [4, 4, 0, 0],
+        color: params => {
+          const v = top10[params.dataIndex]?.ruleEvaluation
+          return v === 'LOW_STOCK' ? '#f56c6c' : v === 'HIGH' ? '#e6a23c' : v === 'DEAD_STOCK' ? '#f0ad4e' : '#67c23a'
+        }
+      }
+    }]
+  }
+})
 
 onMounted(() => {
   loadData()
+  startAlertPolling()
+})
+
+onUnmounted(() => {
+  if (alertTimer) clearInterval(alertTimer)
 })
 
 async function loadData() {
@@ -230,40 +258,97 @@ async function loadData() {
     stats.deadStockCount = stockData.value.filter(r => r.ruleEvaluation === 'DEAD_STOCK').length
     stats.highRiskCount = stockData.value.filter(r => r.ruleEvaluation === 'LOW_STOCK').length
     lastUpdateTime.value = new Date().toLocaleTimeString('zh-CN')
-  } catch { /* 后端未就绪 */ }
+
+    // 加载最近动态
+    await loadRecentActivity()
+  } catch { /* */ }
+}
+
+// ==================== 最近动态 ====================
+async function loadRecentActivity() {
+  try {
+    const [inRes, outRes] = await Promise.all([
+      getInboundOrders({ page: 1, size: 8 }),
+      getOutboundOrders({ page: 1, size: 8 })
+    ])
+    const items = []
+    ;(inRes.records || []).forEach(r => {
+      items.push({
+        type: 'inbound',
+        text: `入库单 ${r.orderNo} — ${r.status}`,
+        time: r.createdAt?.substring(0, 16) || '',
+        ts: new Date(r.createdAt).getTime()
+      })
+    })
+    ;(outRes.records || []).forEach(r => {
+      items.push({
+        type: 'outbound',
+        text: `出库单 ${r.orderNo} — ${r.status}`,
+        time: r.createdAt?.substring(0, 16) || '',
+        ts: new Date(r.createdAt).getTime()
+      })
+    })
+    items.sort((a, b) => b.ts - a.ts)
+    recentActivity.value = items.slice(0, 10)
+  } catch { /* */ }
+}
+
+// ==================== 实时告警轮询 ====================
+function startAlertPolling() {
+  alertTimer = setInterval(async () => {
+    try {
+      const data = await getStockReport({})
+      const currentLowSet = new Set()
+      ;(data || []).forEach(r => {
+        if (r.ruleEvaluation === 'LOW_STOCK') currentLowSet.add(r.materialCode)
+      })
+      // 检测新增的低储物料
+      const newLows = [...currentLowSet].filter(c => !lastLowStockSet.has(c))
+      if (newLows.length) {
+        ElNotification({
+          title: '⚠ 库存预警',
+          message: `以下物料触发超低储预警：${newLows.join(', ')}`,
+          type: 'warning',
+          duration: 10000
+        })
+      }
+      lastLowStockSet = currentLowSet
+    } catch { /* */ }
+  }, 60000)
+}
+
+// ==================== 扫码入库 ====================
+async function onBarcodeScanned(code) {
+  scanResult.value = null
+  scanError.value = ''
+  try {
+    const data = await scanInbound({ barcode: code })
+    scanResult.value = data
+    ElMessage.success(`入库成功：${data.materialCode}`)
+    loadData()
+  } catch (err) {
+    scanError.value = err.message || '入库失败'
+  }
 }
 
 async function handleQuickSearch() {
   if (!quickCode.value.trim()) return
   quickLoading.value = true
   quickSearched.value = true
-  try {
-    quickResult.value = await getLatestReport(quickCode.value.trim())
-  } catch {
-    quickResult.value = null
-  } finally {
-    quickLoading.value = false
-  }
+  try { quickResult.value = await getLatestReport(quickCode.value.trim()) } catch { quickResult.value = null }
+  finally { quickLoading.value = false }
 }
 
 async function handleTriggerPredict() {
-  try {
-    await triggerPredict(quickCode.value.trim())
-    ElMessage.success('AI 预测任务已启动，请稍后刷新查看')
-  } catch {
-    ElMessage.error('启动失败')
-  }
+  try { await triggerPredict(quickCode.value.trim()); ElMessage.success('AI 预测任务已启动') }
+  catch { ElMessage.error('启动失败') }
 }
 
-// ==================== 打印看板 ====================
-function doPrintDashboard() {
-  window.print()
-}
+function doPrintDashboard() { window.print() }
 
-// ---- 辅助函数 ----
+// 辅助
 function badgeClass(v) {
-  const m = { 'LOW_STOCK': 'danger', 'DEAD_STOCK': 'warn', 'HIGH': 'warn',
-    'BOTH': 'danger', 'CRITICAL': 'danger', 'NORMAL': 'success' }
+  const m = { 'LOW_STOCK': 'danger', 'DEAD_STOCK': 'warn', 'HIGH': 'warn', 'BOTH': 'danger', 'CRITICAL': 'danger', 'NORMAL': 'success' }
   return m[v] || 'default'
 }
 function ruleLabel(v) {
@@ -277,161 +362,66 @@ function riskLabel(v) {
 </script>
 
 <style scoped>
-/* 统计概览 */
-.stat-row {
-  display: flex;
-  align-items: center;
-  gap: 32px;
-  background: var(--content-bg);
-  padding: 20px 24px;
-  border-radius: 4px;
-  box-shadow: var(--shadow-light);
-  margin-bottom: 16px;
-}
-.stat-item {
-  display: flex;
-  flex-direction: column;
-}
-.stat-spacer {
-  flex: 1;
-}
-.stat-tip {
-  font-size: 12px;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+.stat-row { display: flex; align-items: center; gap: 32px; background: var(--content-bg); padding: 20px 24px; border-radius: 4px; box-shadow: var(--shadow-light); margin-bottom: 16px; }
+.stat-item { display: flex; flex-direction: column; }
+.stat-spacer { flex: 1; }
+.stat-tip { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; }
+.stat-number { font-size: 28px; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+.stat-desc { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+.stat-warn .stat-number { color: var(--wms-warning); }
+.stat-danger .stat-number { color: var(--wms-danger); }
+
+/* 图表 */
+.chart-row { display: flex; gap: 16px; margin-bottom: 16px; }
+.chart-half { flex: 1; min-width: 0; }
+
+/* 扫码 */
+.scan-block { margin-bottom: 16px; }
+.scan-row { display: flex; align-items: center; justify-content: center; gap: 16px; }
+.scan-result { margin-top: 12px; padding: 12px; background: #f0f9eb; border-radius: 4px; border: 1px solid #e1f3d8; }
+.scan-error { margin-top: 12px; padding: 10px 14px; background: #fef0f0; border-radius: 4px; color: #f56c6c; font-size: 13px; display: flex; align-items: center; gap: 6px; }
 
 /* 工作区 */
-.work-area {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-}
-.work-left {
-  flex: 1;
-  min-width: 0;
-}
-.work-right {
-  width: 340px;
-  flex-shrink: 0;
-}
+.work-area { display: flex; gap: 16px; align-items: flex-start; }
+.work-left { flex: 1; min-width: 0; }
+.work-right { width: 360px; flex-shrink: 0; }
 
-/* 速查结果 */
+/* 动态 */
+.activity-list { font-size: 12px; }
+.activity-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border-light); }
+.act-badge { display: inline-block; padding: 1px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap; color: #fff; }
+.act-badge.badge-success { background: #67c23a; }
+.act-badge.badge-warn { background: #e6a23c; }
+.act-text { flex: 1; color: var(--text-regular); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-time { color: var(--text-secondary); white-space: nowrap; font-size: 11px; }
+
+/* 速查 */
 .quick-result { font-size: 13px; }
-.qr-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border-light);
-}
+.qr-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border-light); }
 .qr-label { color: var(--text-secondary); }
 .qr-value { color: var(--text-primary); }
-.qr-advice {
-  font-size: 13px;
-  color: var(--text-regular);
-  line-height: 1.7;
-}
+.qr-advice { font-size: 13px; color: var(--text-regular); line-height: 1.7; }
 
-/* 状态徽章 */
-.badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 3px;
-  font-size: 12px;
-  font-weight: 500;
-}
+.badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 500; }
 .badge-success { background: #f0f9eb; color: #67c23a; }
 .badge-warn    { background: #fdf6ec; color: #e6a23c; }
 .badge-danger  { background: #fef0f0; color: #f56c6c; }
 .badge-default { background: #f4f4f5; color: #909399; }
 
-/* ==================== 扫码入库 ==================== */
-.scan-block { margin-bottom: 16px; }
-.scan-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-}
-.scan-result {
-  margin-top: 12px;
-  padding: 12px;
-  background: #f0f9eb;
-  border-radius: 4px;
-  border: 1px solid #e1f3d8;
-}
-.scan-error {
-  margin-top: 12px;
-  padding: 10px 14px;
-  background: #fef0f0;
-  border-radius: 4px;
-  color: #f56c6c;
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* ==================== 打印专用 ==================== */
-.print-only-header {
-  display: none;
-}
-.print-only-header h2 {
-  font-size: 20px;
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-.print-only-header span {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
+.print-only-header { display: none; }
+.print-only-header h2 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+.print-only-header span { font-size: 13px; color: var(--text-secondary); }
 
 @media print {
-  body {
-    background: white !important;
-  }
-  .admin-sidebar,
-  .admin-header,
-  .stat-tip,
-  .work-right,
-  .scan-block {
-    display: none !important;
-  }
-  .admin-content {
-    margin-left: 0 !important;
-    padding: 0 !important;
-  }
-  .page-container {
-    padding: 10px !important;
-  }
-  .content-block {
-    box-shadow: none !important;
-    border: 1px solid #ccc !important;
-    break-inside: avoid;
-  }
-  .stat-row {
-    break-inside: avoid;
-    border: 1px solid #ccc;
-    padding: 12px;
-  }
-  .work-area {
-    flex-direction: column !important;
-  }
-  .work-left {
-    width: 100% !important;
-  }
-  .print-only-header {
-    display: block;
-    text-align: center;
-    margin-bottom: 16px;
-    padding-bottom: 12px;
-    border-bottom: 2px solid #333;
-  }
-  .badge {
-    border: 1px solid #999 !important;
-  }
+  body { background: white !important; }
+  .admin-sidebar, .admin-header, .stat-tip, .work-right, .scan-block, .chart-row { display: none !important; }
+  .admin-content { margin-left: 0 !important; padding: 0 !important; }
+  .page-container { padding: 10px !important; }
+  .content-block { box-shadow: none !important; border: 1px solid #ccc !important; break-inside: avoid; }
+  .stat-row { break-inside: avoid; border: 1px solid #ccc; padding: 12px; }
+  .work-area { flex-direction: column !important; }
+  .work-left { width: 100% !important; }
+  .print-only-header { display: block; text-align: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #333; }
+  .badge { border: 1px solid #999 !important; }
 }
 </style>

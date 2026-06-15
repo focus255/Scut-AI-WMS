@@ -6,6 +6,11 @@
  */
 package com.smartwms.controller;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.smartwms.common.Result;
 import com.smartwms.dto.ConfirmInboundRequest;
@@ -101,5 +106,26 @@ public class InboundController {
             @RequestParam(required = false) String barcode,
             @RequestParam(required = false) String orderNo) {
         return Result.success(inboundService.trace(materialCode, barcode, orderNo));
+    }
+
+    /**
+     * 批量导入入库单。
+     * POST /api/inbound/batch
+     * 接收入库单列表，逐一创建并返回创建结果汇总。
+     */
+    @PostMapping("/batch")
+    public Result<Map<String, Object>> batchCreate(@Valid @RequestBody List<InboundOrderRequest> requests) {
+        int successCount = 0;
+        List<String> createdOrderNos = new ArrayList<>();
+        for (InboundOrderRequest req : requests) {
+            InboundOrder order = inboundService.create(req);
+            createdOrderNos.add(order.getOrderNo());
+            successCount++;
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total", requests.size());
+        result.put("successCount", successCount);
+        result.put("orderNos", createdOrderNos);
+        return Result.success("批量导入完成", result);
     }
 }

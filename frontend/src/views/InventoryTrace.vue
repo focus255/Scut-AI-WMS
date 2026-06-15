@@ -22,8 +22,23 @@
         </el-button>
         <span class="toolbar-tip">{{ traceData.length > 0 ? `共 ${traceData.length} 条追溯记录` : '至少输入一个查询条件' }}</span>
       </div>
+      <!-- 状态统计 -->
+      <div v-if="traceData.length" class="stat-row" style="margin-bottom: 16px">
+        <div class="stat-item"><span class="stat-num warn">{{ statusStats['待入库'] }}</span><span class="stat-lbl">待入库</span></div>
+        <div class="stat-item"><span class="stat-num success">{{ statusStats['在库'] }}</span><span class="stat-lbl">在库</span></div>
+        <div class="stat-item"><span class="stat-num default">{{ statusStats['已出库'] }}</span><span class="stat-lbl">已出库</span></div>
+        <div class="stat-item"><span class="stat-num danger">{{ statusStats['其他'] }}</span><span class="stat-lbl">异常</span></div>
+        <div class="stat-spacer"></div>
+        <div>
+          <el-button size="small" :disabled="!selectedRows.length" @click="batchPrint">批量打印 ({{ selectedRows.length }})</el-button>
+          <el-button size="small" @click="doExport">导出 CSV</el-button>
+        </div>
+      </div>
+
       <el-table :data="traceData" stripe size="small" v-loading="loading"
-        empty-text="暂无追溯数据，请尝试修改查询条件">
+        empty-text="暂无追溯数据，请尝试修改查询条件"
+        @selection-change="(rows) => selectedRows = rows">
+        <el-table-column type="selection" width="40" />
         <el-table-column label="条码号" min-width="280">
           <template #default="{ row }">
             <div class="trace-barcode-cell">
@@ -64,18 +79,32 @@
 /**
  * 库存追溯查询 — 联查条码与入库明细，展示完整生命周期。
  */
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getInventoryTrace } from '@/api/inbound'
+import { exportCSV } from '@/utils/export'
 import QRCode from '@/components/QRCode.vue'
 
 const loading = ref(false)
 const traceData = ref([])
+const selectedRows = ref([])
 
 const query = reactive({
   materialCode: '',
   barcode: '',
   orderNo: ''
+})
+
+// 状态统计
+const statusStats = computed(() => {
+  const s = { '待入库': 0, '在库': 0, '已出库': 0, '其他': 0 }
+  traceData.value.forEach(r => {
+    if (r.status === '待入库') s['待入库']++
+    else if (r.status === '在库') s['在库']++
+    else if (r.status === '已出库') s['已出库']++
+    else s['其他']++
+  })
+  return s
 })
 
 async function doQuery() {
@@ -106,9 +135,45 @@ function statusBadgeClass(status) {
   if (status === '已出库') return 'badge-default'
   return 'badge-warn'
 }
+
+/**
+ * 批量打印选中的条码标签。
+ */
+function batchPrint() {
+  if (!selectedRows.value.length) { ElMessage.warning('请先选择条码'); return }
+  const barcodes = selectedRows.value.map(r => r.barcode).join('\n')
+  const win = window.open('', '_blank', 'width=800,height=600')
+  win.document.write('<html><head><title>批量条码打印</title><\/head><body>' +
+    '<pre style="font-family: monospace; font-size: 12px; line-height: 1.8">' + barcodes + '<\/pre>' +
+    '<script>window.onload=function(){window.print()}<\/script><\/body><\/html>')
+  win.document.close()
+}
+
+function doExport() {
+  if (!traceData.value.length) { ElMessage.warning('没有数据可导出'); return }
+  exportCSV([
+    { key: 'barcode', label: '条码号' },
+    { key: 'materialCode', label: '物料号' },
+    { key: 'supplierCode', label: '供应商' },
+    { key: 'orderNo', label: '入库单号' },
+    { key: 'status', label: '状态' },
+    { key: 'actualQty', label: '实收数' },
+    { key: 'barcodeUpdatedAt', label: '最后更新' }
+  ], traceData.value, `库存追溯_${new Date().toISOString().substring(0, 10)}`)
+  ElMessage.success('导出成功')
+}
 </script>
 
 <style scoped>
+.stat-row { display: flex; align-items: center; gap: 24px; background: var(--content-bg); padding: 14px 20px; border-radius: 4px; box-shadow: var(--shadow-light); }
+.stat-item { display: flex; flex-direction: column; align-items: center; }
+.stat-num { font-size: 22px; font-weight: 700; line-height: 1.2; }
+.stat-num.success { color: #67c23a; }
+.stat-num.warn { color: #e6a23c; }
+.stat-num.danger { color: #f56c6c; }
+.stat-num.default { color: #909399; }
+.stat-lbl { font-size: 12px; color: var(--text-secondary); }
+.stat-spacer { flex: 1; }
 .toolbar-tip {
   font-size: 12px;
   color: var(--text-secondary);
