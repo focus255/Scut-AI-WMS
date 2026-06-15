@@ -90,8 +90,16 @@
               </template>
             </el-table-column>
             <el-table-column prop="createdAt" label="创建时间" min-width="170" show-overflow-tooltip />
-            <el-table-column label="操作" width="200" align="center">
+            <el-table-column label="操作" width="280" align="center">
               <template #default="{ row }">
+                <el-button v-if="row.status !== '已完成'" type="primary" link size="small"
+                  @click.stop="openOutEditDialog(row)">
+                  编辑
+                </el-button>
+                <el-button v-if="row.status === '未出库'" type="danger" link size="small"
+                  @click.stop="handleOutDelete(row)">
+                  删除
+                </el-button>
                 <el-button v-if="row.status !== '已完成'" type="success" link size="small"
                   @click.stop="openOutConfirmDialog(row)">
                   确认出库
@@ -552,6 +560,53 @@
       </el-dialog>
     </Teleport>
 
+    <!-- 修改出库单对话框 (Teleport to body) -->
+    <Teleport to="body">
+      <el-dialog v-model="outEditVisible" title="修改出库单"
+        width="min(720px, calc(100vw - 32px))" destroy-on-close>
+        <el-alert title="修改后将重新执行拆零拣选，原出库标签将被替换。"
+          type="warning" show-icon :closable="false" class="draft-alert" />
+        <el-form ref="outEditFormRef" :model="outEditForm" label-width="88px">
+          <el-form-item label="物料明细" prop="details">
+            <div class="detail-editor">
+              <div class="detail-head">
+                <span>物料号</span><span>单箱容量</span><span>计划出库数</span><span>操作</span>
+              </div>
+              <div v-for="(item, idx) in outEditForm.details" :key="idx" class="detail-row">
+                <el-select v-model="item.materialCode" placeholder="搜索物料号" size="small"
+                  filterable remote :remote-method="(q) => searchOutEditMaterials(q, idx)"
+                  :loading="outEditMaterialLoading[idx]" clearable style="width: 100%"
+                  @focus="searchOutEditMaterials('', idx)">
+                  <el-option v-for="m in outEditMaterialOptions[idx]" :key="m.materialCode"
+                    :label="`${m.materialCode} — ${m.materialName}`" :value="m.materialCode" />
+                </el-select>
+                <el-input-number v-model="item.packCapacity" :min="1" :max="999999" size="small" controls-position="right" />
+                <el-input-number v-model="item.planQty" :min="1" :max="999999" size="small" controls-position="right" />
+                <el-button type="danger" link size="small" @click="removeOutEditDetail(idx)"
+                  :disabled="outEditForm.details.length <= 1">
+                  <el-icon :size="14"><Delete /></el-icon><span>删除</span>
+                </el-button>
+              </div>
+              <div class="detail-actions">
+                <el-button type="primary" link size="small" @click="addOutEditDetail">
+                  <el-icon :size="14"><Plus /></el-icon><span>添加物料行</span>
+                </el-button>
+              </div>
+            </div>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <div class="dialog-footer">
+            <span class="footer-tip">修改后需重新确认出库。</span>
+            <div>
+              <el-button @click="outEditVisible = false">取消</el-button>
+              <el-button type="primary" :loading="outEditSubmitting" @click="handleOutEditSubmit">保存修改</el-button>
+            </div>
+          </div>
+        </template>
+      </el-dialog>
+    </Teleport>
+
     <!-- 出库流水查询对话框 (Teleport to body) -->
     <Teleport to="body">
       <el-dialog v-model="historyVisible" title="出库批次流水查询"
@@ -586,10 +641,10 @@
  */
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Printer, Download } from '@element-plus/icons-vue'
 import { getInboundOrders, createInbound, updateInbound, confirmInbound, getInboundDetail } from '@/api/inbound'
-import { getOutboundOrders, createOutbound, confirmOutbound, getOutboundDetail, getOutboundHistories } from '@/api/outbound'
+import { getOutboundOrders, createOutbound, updateOutbound, deleteOutbound, confirmOutbound, getOutboundDetail, getOutboundHistories } from '@/api/outbound'
 import { getSuppliers } from '@/api/suppliers'
 import { getMaterials } from '@/api/materials'
 import { getAppliances } from '@/api/appliances'
@@ -1155,6 +1210,73 @@ async function handleOutCreate() {
   } catch (err) {
     ElMessage.error(err.message || '创建出库单失败')
   }
+}
+
+// ==================== 修改出库单 ====================
+const outEditVisible = ref(false)
+const outEditFormRef = ref(null)
+const outEditTarget = ref(null)
+const outEditSubmitting = ref(false)
+const outEditMaterialOptions = ref({})
+const outEditMaterialLoading = ref({})
+const outEditForm = reactive({
+  details: [{ materialCode: '', packCapacity: 20, planQty: 200 }]
+})
+
+function addOutEditDetail() { outEditForm.details.push({ materialCode: '', packCapacity: 20, planQty: 100 }) }
+function removeOutEditDetail(idx) { if (outEditForm.details.length > 1) outEditForm.details.splice(idx, 1) }
+
+async function searchOutEditMaterials(query, idx) {
+  outEditMaterialLoading.value[idx] = true
+  try {
+    const data = await getMaterials({ page: 1, size: 20, keyword: query || undefined })
+    outEditMaterialOptions.value[idx] = data.records || []
+  } catch { outEditMaterialOptions.value[idx] = [] }
+  finally { outEditMaterialLoading.value[idx] = false }
+}
+
+async function openOutEditDialog(row) {
+  outEditTarget.value = row
+  outEditSubmitting.value = false
+  outEditMaterialOptions.value = {}
+  try {
+    const data = await getOutboundDetail(row.id)
+    outEditForm.details = (data.details || []).map(d => ({
+      materialCode: d.materialCode || '',
+      packCapacity: d.packCapacity || 20,
+      planQty: d.planQty || 100
+    }))
+    if (outEditForm.details.length === 0) {
+      outEditForm.details = [{ materialCode: '', packCapacity: 20, planQty: 200 }]
+    }
+    outEditVisible.value = true
+  } catch { ElMessage.error('加载出库单详情失败') }
+}
+
+async function handleOutEditSubmit() {
+  const invalid = outEditForm.details.find(d =>
+    !d.materialCode?.trim() || !d.packCapacity || !d.planQty
+  )
+  if (invalid) { ElMessage.warning('请完整填写每一行物料明细'); return }
+  outEditSubmitting.value = true
+  try {
+    await updateOutbound(outEditTarget.value.id, { details: outEditForm.details })
+    ElMessage.success('出库单修改成功')
+    outEditVisible.value = false
+    loadOutboundOrders()
+  } catch (err) { ElMessage.error(err.message || '修改出库单失败') }
+  finally { outEditSubmitting.value = false }
+}
+
+async function handleOutDelete(row) {
+  try {
+    await ElMessageBox.confirm(`确定删除出库单 ${row.orderNo}？已拣库存将退回。`, '确认删除', {
+      type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消'
+    })
+    await deleteOutbound(row.id)
+    ElMessage.success('出库单已删除')
+    loadOutboundOrders()
+  } catch { /* 取消或失败 */ }
 }
 
 // ==================== 确认出库 ====================

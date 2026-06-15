@@ -55,7 +55,7 @@
         </el-button>
         <el-button size="large" @click="scannerRef?.openUpload()">
           <el-icon :size="18"><Upload /></el-icon>
-          <span>上传图片</span>
+          <span>上传看板</span>
         </el-button>
       </div>
       <div v-if="scanResult" class="scan-result" :class="scanResult.type === 'outbound' ? 'scan-outbound' : 'scan-inbound'">

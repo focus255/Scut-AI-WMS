@@ -322,8 +322,9 @@ public class InboundServiceImpl implements InboundService {
             }
         }
 
-        // 按条件查询条码
+        // 按条件查询条码（仅入库类型，排除出库标签）
         LambdaQueryWrapper<Barcode> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Barcode::getType, "inbound");
         if (hasMaterial) {
             wrapper.eq(Barcode::getMaterialCode, materialCode);
         }

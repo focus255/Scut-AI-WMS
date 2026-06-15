@@ -24,7 +24,7 @@ public class Barcode {
     /** 唯一箱单标签条码号 */
     private String barcode;
 
-    /** 关联入库单主键 ID（入库条码）/ 关联出库单主键 ID（出库标签） */
+    /** 来源单据 ID：入库条码时为入库单 ID，出库标签时为出库单 ID（字段名 inboundId 因历史原因保留） */
     private Long inboundId;
 
     /** 条码类型：inbound（入库条码）/ outbound（出库标签） */

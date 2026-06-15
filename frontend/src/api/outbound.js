@@ -47,6 +47,23 @@ export function getOutboundHistories(params) {
 }
 
 /**
+ * 修改出库单（仅未出库/部分出库状态）。
+ * @param {number} id 出库单 ID
+ * @param {Object} data { details }
+ */
+export function updateOutbound(id, data) {
+  return request.put(`/outbound/orders/${id}`, data)
+}
+
+/**
+ * 删除出库单（仅未出库状态）。
+ * @param {number} id 出库单 ID
+ */
+export function deleteOutbound(id) {
+  return request.delete(`/outbound/orders/${id}`)
+}
+
+/**
  * 统一扫码：自动判定入库/出库条码并执行对应操作。
  * @param {Object} data { barcode }
  */

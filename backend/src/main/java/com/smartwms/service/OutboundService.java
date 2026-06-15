@@ -29,4 +29,15 @@ public interface OutboundService {
      * @return 统一扫码响应
      */
     ScanResponse scanOutbound(String barcodeStr);
+
+    /**
+     * 修改出库单（仅"未出库"/"部分出库"状态可修改）。
+     * 修改会退回已拣库存并重新执行拆零拣选。
+     */
+    void update(Long id, OutboundOrderRequest request);
+
+    /**
+     * 删除出库单（仅"未出库"状态可删除，退回已拣库存）。
+     */
+    void delete(Long id);
 }

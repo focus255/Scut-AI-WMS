@@ -13,6 +13,7 @@ import com.smartwms.entity.OutboundOrder;
 import com.smartwms.service.InboundService;
 import com.smartwms.service.OutboundService;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -82,6 +83,25 @@ public class OutboundController {
                                                          @RequestParam(required = false) String orderNo,
                                                          @RequestParam(required = false) String materialCode) {
         return Result.success(outboundService.pageHistories(page, size, orderNo, materialCode));
+    }
+
+    /**
+     * 修改出库单（仅"未出库"或"部分出库"状态可修改）。
+     */
+    @PutMapping("/orders/{id}")
+    public Result<Void> update(@PathVariable Long id,
+                               @Valid @RequestBody OutboundOrderRequest request) {
+        outboundService.update(id, request);
+        return Result.success("出库单修改成功", null);
+    }
+
+    /**
+     * 删除出库单（仅"未出库"状态可删除，已拣货的库存会退回）。
+     */
+    @DeleteMapping("/orders/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        outboundService.delete(id);
+        return Result.success("出库单删除成功", null);
     }
 
     /**
