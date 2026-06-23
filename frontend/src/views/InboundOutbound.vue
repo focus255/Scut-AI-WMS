@@ -723,21 +723,20 @@
           <el-table-column prop="planQty" label="计划数" width="100" align="center" />
           <el-table-column prop="actualQty" label="实出数" width="100" align="center" />
         </el-table>
-        <!-- 出库看板（出库单创建时已封装，可下载打印后用于扫码出库） -->
+        <!-- 出库看板（一码到底：显示已拣选的入库条码） -->
         <div v-if="outDetailData && outDetailData.barcodes && outDetailData.barcodes.length > 0"
           class="barcode-gallery">
-          <div class="barcode-gallery-title">出库看板（共 {{ outDetailData.barcodes.length }} 个，点击可下载完整标签）</div>
+          <div class="barcode-gallery-title">出库看板（共 {{ outDetailData.barcodes.length }} 个入库条码，一码到底）</div>
           <div class="label-grid">
             <div v-for="bc in outDetailData.barcodes" :key="bc.barcode" class="label-card"
               @click="downloadOutLabel(bc, $event)">
               <div class="label-card-header">
-                <span class="barcode-status-tag" :class="bc.status === '已出库' ? 'tag-outbound' : 'tag-pending'">
+                <span class="barcode-status-tag" :class="bc.status === '已出库' ? 'tag-in-stock' : 'tag-pending'">
                   {{ bc.status }}
                 </span>
                 <el-icon :size="14" class="download-icon"><Download /></el-icon>
               </div>
               <BoxLabel :ref="el => setOutLabelRef(bc.barcode, el)"
-                type="outbound"
                 :barcode="bc.barcode"
                 :status="bc.status"
                 :order-no="outDetailData.orderNo"

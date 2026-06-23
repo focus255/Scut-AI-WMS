@@ -156,6 +156,16 @@ public class InboundServiceImpl implements InboundService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public List<InboundOrder> batchCreate(List<InboundOrderRequest> requests) {
+        List<InboundOrder> orders = new ArrayList<>();
+        for (InboundOrderRequest req : requests) {
+            orders.add(create(req));
+        }
+        return orders;
+    }
+
+    @Override
     public InboundOrderVO getById(Long id) {
         InboundOrder order = inboundOrderMapper.selectById(id);
         if (order == null) {
@@ -346,6 +356,18 @@ public class InboundServiceImpl implements InboundService {
 
         // 入库核销
         return doScanReceive(barcode, request.getActualQty());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long id) {
+        InboundOrder order = inboundOrderMapper.selectById(id);
+        if (order == null) throw new BusinessException(ErrorCode.NOT_FOUND, "入库单不存在");
+        if (!"未入库".equals(order.getStatus()))
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "仅未入库状态的入库单可删除");
+        inboundDetailMapper.delete(new LambdaQueryWrapper<InboundDetail>().eq(InboundDetail::getInboundId, id));
+        barcodeMapper.delete(new LambdaQueryWrapper<Barcode>().eq(Barcode::getInboundId, id));
+        inboundOrderMapper.deleteById(id);
     }
 
     @Override

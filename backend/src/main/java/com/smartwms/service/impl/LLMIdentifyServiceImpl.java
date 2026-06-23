@@ -11,9 +11,11 @@ import com.smartwms.common.BusinessException;
 import com.smartwms.common.ErrorCode;
 import com.smartwms.entity.AiReport;
 import com.smartwms.entity.Inventory;
+import com.smartwms.entity.OutboundHistory;
 import com.smartwms.engine.RuleMockEngine;
 import com.smartwms.mapper.AiReportMapper;
 import com.smartwms.mapper.InventoryMapper;
+import com.smartwms.mapper.OutboundHistoryMapper;
 import com.smartwms.service.LLMIdentifyService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class LLMIdentifyServiceImpl implements LLMIdentifyService {
@@ -30,13 +33,16 @@ public class LLMIdentifyServiceImpl implements LLMIdentifyService {
 
     private final AiReportMapper aiReportMapper;
     private final InventoryMapper inventoryMapper;
+    private final OutboundHistoryMapper outboundHistoryMapper;
     private final RuleMockEngine ruleMockEngine;
 
     public LLMIdentifyServiceImpl(AiReportMapper aiReportMapper,
                                    InventoryMapper inventoryMapper,
+                                   OutboundHistoryMapper outboundHistoryMapper,
                                    RuleMockEngine ruleMockEngine) {
         this.aiReportMapper = aiReportMapper;
         this.inventoryMapper = inventoryMapper;
+        this.outboundHistoryMapper = outboundHistoryMapper;
         this.ruleMockEngine = ruleMockEngine;
     }
 
@@ -102,9 +108,12 @@ public class LLMIdentifyServiceImpl implements LLMIdentifyService {
             // TODO(Focus, 2026-06-03): 后续对接真实大模型 API 替换此桩实现
             Inventory inventory = inventoryMapper.selectById(materialId);
 
-            // 使用默认日均消耗模拟数据
+            // 从近30天出库流水计算真实日均消耗和未来15天需求预测
+            double dailyConsume = computeDailyConsume(report.getMaterialCode());
+            double futureDemand = dailyConsume * 15.0;
+
             AiReport mockReport = ruleMockEngine.generateMockReport(
-                    report.getMaterialCode(), inventory, 10.0, 150.0
+                    report.getMaterialCode(), inventory, dailyConsume, futureDemand
             );
 
             // 将 Mock 结果回写到报告记录
@@ -122,10 +131,12 @@ public class LLMIdentifyServiceImpl implements LLMIdentifyService {
                     report.getRiskType());
         } catch (Exception e) {
             log.warn("[AI-API-Timeout] 调用外部LLM接口超时异常，系统无缝启动精益Mock规则引擎拼装基础降级报告方案");
-            // 兜底：调用 Mock 引擎
+            // 兜底：调用 Mock 引擎（使用真实日均消耗）
             Inventory inventory = inventoryMapper.selectById(materialId);
+            double dailyConsume = computeDailyConsume(report.getMaterialCode());
+            double futureDemand = dailyConsume * 15.0;
             AiReport fallback = ruleMockEngine.generateMockReport(
-                    report.getMaterialCode(), inventory, 10.0, 150.0
+                    report.getMaterialCode(), inventory, dailyConsume, futureDemand
             );
             fallback.setPredictionStatus("MOCKED");
             fallback.setUpdatedAt(LocalDateTime.now());
@@ -133,5 +144,23 @@ public class LLMIdentifyServiceImpl implements LLMIdentifyService {
             fallback.setId(report.getId());
             aiReportMapper.updateById(fallback);
         }
+    }
+
+    /**
+     * 根据近30天出库流水计算物料日均消耗量。
+     * 若无出库记录则返回默认值 10 件/天。
+     */
+    private double computeDailyConsume(String materialCode) {
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        List<OutboundHistory> histories = outboundHistoryMapper.selectList(
+                new LambdaQueryWrapper<OutboundHistory>()
+                        .eq(OutboundHistory::getMaterialCode, materialCode)
+                        .ge(OutboundHistory::getCreatedAt, thirtyDaysAgo)
+        );
+        if (histories.isEmpty()) return 10.0;
+        int totalDeduct = histories.stream()
+                .mapToInt(h -> h.getDeductQty() != null ? h.getDeductQty() : 0)
+                .sum();
+        return Math.max(1.0, (double) totalDeduct / 30.0);
     }
 }

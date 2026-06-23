@@ -65,6 +65,12 @@ const routes = [
         name: 'InboundHistory',
         component: () => import('@/views/InboundHistory.vue'),
         meta: { title: '入库历史' }
+      },
+      {
+        path: 'freeze',
+        name: 'FreezeManagement',
+        component: () => import('@/views/FreezeManagement.vue'),
+        meta: { title: '封存解封管理' }
       }
     ]
   },

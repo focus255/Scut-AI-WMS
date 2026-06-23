@@ -88,6 +88,16 @@ public class InboundController {
     }
 
     /**
+     * 删除入库单（仅"未入库"状态可删除）。
+     * DELETE /api/inbound/orders/{id}
+     */
+    @DeleteMapping("/orders/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        inboundService.delete(id);
+        return Result.success("入库单已删除", null);
+    }
+
+    /**
      * 扫码入库：按条码号精确核销单箱入库。
      * POST /api/inbound/scan
      */
@@ -115,17 +125,12 @@ public class InboundController {
      */
     @PostMapping("/batch")
     public Result<Map<String, Object>> batchCreate(@Valid @RequestBody List<InboundOrderRequest> requests) {
-        int successCount = 0;
-        List<String> createdOrderNos = new ArrayList<>();
-        for (InboundOrderRequest req : requests) {
-            InboundOrder order = inboundService.create(req);
-            createdOrderNos.add(order.getOrderNo());
-            successCount++;
-        }
+        List<InboundOrder> orders = inboundService.batchCreate(requests);
+        List<String> orderNos = orders.stream().map(InboundOrder::getOrderNo).toList();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", requests.size());
-        result.put("successCount", successCount);
-        result.put("orderNos", createdOrderNos);
+        result.put("successCount", orders.size());
+        result.put("orderNos", orderNos);
         return Result.success("批量导入完成", result);
     }
 }

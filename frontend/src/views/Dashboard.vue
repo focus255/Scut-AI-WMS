@@ -38,37 +38,71 @@
       </div>
     </div>
 
-    <!-- 扫码出入库快捷入口 -->
+    <!-- 扫码操作面板 -->
     <div class="content-block scan-block">
       <div class="block-header">
-        <span class="block-title">扫码出入库</span>
+        <span class="block-title">扫码操作</span>
       </div>
-      <div class="scan-row">
-        <el-button size="large" @click="scannerRef?.openCamera()">
-          <el-icon :size="18"><Camera /></el-icon>
+
+      <!-- 模式选择 -->
+      <div class="scan-mode-row">
+        <div class="scan-mode-item" :class="{ active: scanMode === 'inbound' }"
+          @click="switchScanMode('inbound')">
+          <el-icon :size="22"><Box /></el-icon>
+          <span>入库</span>
+        </div>
+        <div class="scan-mode-item" :class="{ active: scanMode === 'outbound' }"
+          @click="switchScanMode('outbound')">
+          <el-icon :size="22"><Sell /></el-icon>
+          <span>出库</span>
+        </div>
+        <div class="scan-mode-item" :class="{ active: scanMode === 'seal' }"
+          @click="switchScanMode('seal')">
+          <el-icon :size="22"><Lock /></el-icon>
+          <span>封存</span>
+        </div>
+        <div class="scan-mode-item" :class="{ active: scanMode === 'unseal' }"
+          @click="switchScanMode('unseal')">
+          <el-icon :size="22"><Unlock /></el-icon>
+          <span>解封</span>
+        </div>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="scan-action-row">
+        <div class="scan-action-btn" @click="openScanCamera">
+          <el-icon :size="28"><Camera /></el-icon>
           <span>摄像头扫码</span>
-        </el-button>
-        <el-button size="large" @click="scannerRef?.openUpload()">
-          <el-icon :size="18"><Upload /></el-icon>
-          <span>上传看板</span>
-        </el-button>
+        </div>
+        <div class="scan-action-btn" @click="openScanUpload">
+          <el-icon :size="28"><Upload /></el-icon>
+          <span>上传图片</span>
+        </div>
       </div>
-      <div v-if="scanResult" class="scan-result" :class="scanResult.type === 'outbound' ? 'scan-outbound' : 'scan-inbound'">
-        <div class="qr-row">
-          <span class="qr-label">类型</span>
-          <span class="badge" :class="scanResult.type === 'outbound' ? 'badge-default' : 'badge-success'">
-            {{ scanResult.type === 'outbound' ? '出库' : '入库' }}
-          </span>
+
+      <!-- 模式说明 -->
+      <div class="scan-mode-hint">
+        <template v-if="scanMode === 'inbound'">扫描入库条码（WMS|... 格式），自动核销入库并更新库存</template>
+        <template v-else-if="scanMode === 'outbound'">扫描已拣货的入库条码（WMS|...），核销出库（一码到底）</template>
+        <template v-else-if="scanMode === 'seal'">扫描在库条码将其封存，封存后该条码不可出库</template>
+        <template v-else>扫描已封存条码将其解封，恢复为在库可流转状态</template>
+      </div>
+
+      <!-- 扫码结果 -->
+      <div v-if="scanResult" class="scan-result" :class="'scan-' + scanMode">
+        <div class="scan-result-header">
+          <el-icon :size="18"><CircleCheckFilled /></el-icon>
+          <span>{{ scanModeLabel }}成功</span>
         </div>
         <div class="qr-row">
           <span class="qr-label">物料号</span>
           <span class="qr-value">{{ scanResult.materialCode }}</span>
         </div>
-        <div class="qr-row">
-          <span class="qr-label">{{ scanResult.type === 'outbound' ? '出库单号' : '入库单号' }}</span>
+        <div class="qr-row" v-if="scanResult.orderNo">
+          <span class="qr-label">{{ scanMode === 'outbound' ? '出库单号' : '入库单号' }}</span>
           <span class="qr-value">{{ scanResult.orderNo }}</span>
         </div>
-        <div class="qr-row">
+        <div class="qr-row" v-if="scanResult.qty">
           <span class="qr-label">数量</span>
           <span class="qr-value">{{ scanResult.qty }} 件</span>
         </div>
@@ -164,10 +198,11 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { getStockReport } from '@/api/stock'
 import { getLatestReport, triggerPredict } from '@/api/ai'
-import { getInboundOrders } from '@/api/inbound'
+import { getInboundOrders, scanInbound } from '@/api/inbound'
 import { getOutboundOrders, unifiedScan } from '@/api/outbound'
+import { sealBarcodes, unsealBarcode } from '@/api/freeze'
 import { ElMessage, ElNotification } from 'element-plus'
-import { WarningFilled, Camera, Upload, Search } from '@element-plus/icons-vue'
+import { WarningFilled, Camera, Upload, Search, Box, Sell, Lock, Unlock, CircleCheckFilled } from '@element-plus/icons-vue'
 import BarcodeScanner from '@/components/BarcodeScanner.vue'
 import ChartCard from '@/components/ChartCard.vue'
 
@@ -187,10 +222,34 @@ const quickLoading = ref(false)
 const quickResult = ref(null)
 const quickSearched = ref(false)
 
-// 扫码入库
+// 扫码操作
+const scanMode = ref('inbound')
 const scanResult = ref(null)
 const scanError = ref('')
 const scannerRef = ref(null)
+
+const scanModeLabel = computed(() => {
+  const map = { inbound: '入库', outbound: '出库', seal: '封存', unseal: '解封' }
+  return map[scanMode.value] || ''
+})
+
+function switchScanMode(mode) {
+  scanMode.value = mode
+  scanResult.value = null
+  scanError.value = ''
+}
+
+function openScanCamera() {
+  scanResult.value = null
+  scanError.value = ''
+  scannerRef.value?.openCamera()
+}
+
+function openScanUpload() {
+  scanResult.value = null
+  scanError.value = ''
+  scannerRef.value?.openUpload()
+}
 
 // 最近动态
 const recentActivity = ref([])
@@ -318,18 +377,61 @@ function startAlertPolling() {
   }, 60000)
 }
 
-// ==================== 扫码出入库 ====================
+// ==================== 扫码操作（入库/出库/封存/解封，严格隔离） ====================
 async function onBarcodeScanned(code) {
   scanResult.value = null
   scanError.value = ''
   try {
-    const data = await unifiedScan({ barcode: code })
-    scanResult.value = data
-    const label = data.type === 'outbound' ? '出库' : '入库'
-    ElMessage.success(`扫码${label}成功：${data.materialCode}，${data.qty} 件`)
-    loadData()
+    // —— 格式校验：根据当前模式拒绝不匹配的条码格式 ——
+    const isInboundBarcode = code.startsWith('WMS|')
+    const isOutboundBarcode = code.startsWith('OUT|')
+
+    switch (scanMode.value) {
+      case 'inbound': {
+        if (isOutboundBarcode) {
+          scanError.value = '这是出库标签（OUT|...），请切换到「出库」模式扫码'
+          return
+        }
+        const data = await scanInbound({ barcode: code })
+        scanResult.value = { ...data, barcode: code }
+        ElMessage.success(`入库成功：${data.materialCode}，${data.qty} 件`)
+        loadData()
+        break
+      }
+      case 'outbound': {
+        if (!isInboundBarcode) {
+          scanError.value = '出库请扫描入库条码（WMS|...），OUT标签已废弃。请切换到对应模式或使用正确的条码'
+          return
+        }
+        const data = await unifiedScan({ barcode: code })
+        scanResult.value = { ...data, barcode: code }
+        ElMessage.success(`出库成功：${data.materialCode}，${data.qty} 件`)
+        loadData()
+        break
+      }
+      case 'seal': {
+        if (isOutboundBarcode) {
+          scanError.value = '出库标签不可封存，请扫描在库条码（WMS|...）'
+          return
+        }
+        await sealBarcodes({ barcodes: [code], freezeType: 'QUALITY', reason: '扫码封存' })
+        scanResult.value = { materialCode: '—', barcode: code }
+        ElMessage.success(`封存成功：${code}`)
+        break
+      }
+      case 'unseal': {
+        if (isOutboundBarcode) {
+          scanError.value = '出库标签不可解封，请扫描封存中的入库条码'
+          return
+        }
+        await unsealBarcode(code)
+        scanResult.value = { materialCode: '—', barcode: code }
+        ElMessage.success(`解封成功：${code}`)
+        break
+      }
+    }
   } catch (err) {
-    scanError.value = err.message || '扫码失败'
+    scanError.value = err.message || '扫码操作失败'
   }
 }
 
@@ -376,12 +478,96 @@ function riskLabel(v) {
 .chart-row { display: flex; gap: 16px; margin-bottom: 16px; }
 .chart-half { flex: 1; min-width: 0; }
 
-/* 扫码 */
+/* 扫码操作面板 */
 .scan-block { margin-bottom: 16px; }
-.scan-row { display: flex; align-items: center; justify-content: center; gap: 16px; }
+
+/* 模式选择行 */
+.scan-mode-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.scan-mode-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border: 2px solid var(--border-light);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  user-select: none;
+}
+.scan-mode-item:hover {
+  border-color: var(--wms-primary);
+  color: var(--wms-primary);
+  background: #ecf5ff;
+}
+.scan-mode-item.active {
+  border-color: var(--wms-primary);
+  background: #ecf5ff;
+  color: var(--wms-primary);
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.15);
+}
+
+/* 扫描按钮行 */
+.scan-action-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.scan-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 32px;
+  border: 2px dashed var(--border-base);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-secondary);
+  flex: 1;
+}
+.scan-action-btn:hover {
+  border-color: var(--wms-primary);
+  color: var(--wms-primary);
+  background: #f5f9ff;
+  border-style: solid;
+}
+
+/* 模式说明 */
+.scan-mode-hint {
+  font-size: 12px;
+  color: var(--text-placeholder);
+  text-align: center;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+/* 扫码结果 */
 .scan-result { margin-top: 12px; padding: 12px; border-radius: 4px; }
+.scan-result-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
 .scan-inbound { background: #f0f9eb; border: 1px solid #e1f3d8; }
+.scan-inbound .scan-result-header { color: #67c23a; }
 .scan-outbound { background: #f4f4f5; border: 1px solid #e4e7ed; }
+.scan-outbound .scan-result-header { color: #909399; }
+.scan-seal { background: #fdf6ec; border: 1px solid #faecd8; }
+.scan-seal .scan-result-header { color: #e6a23c; }
+.scan-unseal { background: #ecf5ff; border: 1px solid #d9ecff; }
+.scan-unseal .scan-result-header { color: #409eff; }
 .scan-error { margin-top: 12px; padding: 10px 14px; background: #fef0f0; border-radius: 4px; color: #f56c6c; font-size: 13px; display: flex; align-items: center; gap: 6px; }
 
 /* 工作区 */

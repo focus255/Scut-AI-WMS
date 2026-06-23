@@ -10,11 +10,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.smartwms.dto.StockReportVO;
 import com.smartwms.entity.Inventory;
 import com.smartwms.entity.Material;
+import com.smartwms.entity.OutboundHistory;
 import com.smartwms.mapper.InventoryMapper;
 import com.smartwms.mapper.MaterialMapper;
+import com.smartwms.mapper.OutboundHistoryMapper;
 import com.smartwms.service.StockService;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,10 +26,14 @@ public class StockServiceImpl implements StockService {
 
     private final InventoryMapper inventoryMapper;
     private final MaterialMapper materialMapper;
+    private final OutboundHistoryMapper outboundHistoryMapper;
 
-    public StockServiceImpl(InventoryMapper inventoryMapper, MaterialMapper materialMapper) {
+    public StockServiceImpl(InventoryMapper inventoryMapper,
+                            MaterialMapper materialMapper,
+                            OutboundHistoryMapper outboundHistoryMapper) {
         this.inventoryMapper = inventoryMapper;
         this.materialMapper = materialMapper;
+        this.outboundHistoryMapper = outboundHistoryMapper;
     }
 
     @Override
@@ -60,8 +67,8 @@ public class StockServiceImpl implements StockService {
             int qty = inv.getStockQty() != null ? inv.getStockQty() : 0;
             int minDays = inv.getMinStockDays() != null ? inv.getMinStockDays() : 3;
             int maxDays = inv.getMaxStockDays() != null ? inv.getMaxStockDays() : 15;
-            // 日均消耗估算（桩：用安全线反推，后续接入真实出库数据）
-            double dailyConsume = 10.0;
+            // 从近30天出库流水计算真实日均消耗，无数据时默认10件/天
+            double dailyConsume = computeDailyConsume(inv.getMaterialCode());
             double lowThreshold = dailyConsume * minDays;
             double highThreshold = dailyConsume * maxDays;
 
@@ -84,5 +91,23 @@ public class StockServiceImpl implements StockService {
             result.add(vo);
         }
         return result;
+    }
+
+    /**
+     * 根据近30天出库流水计算物料日均消耗量。
+     * 若无出库记录则返回默认值 10 件/天。
+     */
+    private double computeDailyConsume(String materialCode) {
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        List<OutboundHistory> histories = outboundHistoryMapper.selectList(
+                new LambdaQueryWrapper<OutboundHistory>()
+                        .eq(OutboundHistory::getMaterialCode, materialCode)
+                        .ge(OutboundHistory::getCreatedAt, thirtyDaysAgo)
+        );
+        if (histories.isEmpty()) return 10.0;
+        int totalDeduct = histories.stream()
+                .mapToInt(h -> h.getDeductQty() != null ? h.getDeductQty() : 0)
+                .sum();
+        return Math.max(1.0, (double) totalDeduct / 30.0);
     }
 }

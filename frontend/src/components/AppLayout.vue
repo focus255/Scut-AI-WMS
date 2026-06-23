@@ -55,6 +55,11 @@
           <el-icon :size="18"><Clock /></el-icon>
           <span class="nav-label">入库历史</span>
         </router-link>
+        <router-link to="/freeze" class="nav-item"
+          :class="{ active: $route.path.startsWith('/freeze') }" @click="mobileMenuOpen = false">
+          <el-icon :size="18"><Lock /></el-icon>
+          <span class="nav-label">封存解封</span>
+        </router-link>
       </nav>
 
       <div class="sidebar-footer" @click="isCollapse = !isCollapse">
@@ -119,7 +124,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { DataAnalysis, Document, Switch, TrendCharts, Cpu, Search, Clock, DArrowLeft, DArrowRight, UserFilled, WarningFilled, Menu, Close } from '@element-plus/icons-vue'
+import { DataAnalysis, Document, Switch, TrendCharts, Cpu, Search, Clock, Lock, DArrowLeft, DArrowRight, UserFilled, WarningFilled, Menu, Close } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

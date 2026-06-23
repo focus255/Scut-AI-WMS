@@ -15,12 +15,19 @@ import com.smartwms.dto.ScanInboundRequest;
 import com.smartwms.dto.ScanInboundVO;
 import com.smartwms.entity.InboundOrder;
 
+import java.util.List;
+
 public interface InboundService {
 
     /**
      * 创建入库单（生成唯一单号、拆分条码）。
      */
     InboundOrder create(InboundOrderRequest request);
+
+    /**
+     * 批量创建入库单（同一事务，全部成功或全部回滚）。
+     */
+    List<InboundOrder> batchCreate(List<InboundOrderRequest> requests);
 
     /**
      * 分页查询入库单列表。
@@ -49,6 +56,11 @@ public interface InboundService {
      * 扫码入库：按条码号精确核销单箱入库。
      */
     ScanInboundVO scanReceive(ScanInboundRequest request);
+
+    /**
+     * 删除入库单（仅"未入库"状态可删除）。
+     */
+    void delete(Long id);
 
     /**
      * 库存追溯：按物料/条码/入库单号查询条码生命周期轨迹。
