@@ -70,7 +70,7 @@ const routes = [
         path: 'freeze',
         name: 'FreezeManagement',
         component: () => import('@/views/FreezeManagement.vue'),
-        meta: { title: '封存解封管理' }
+        meta: { title: '封存管理' }
       }
     ]
   },

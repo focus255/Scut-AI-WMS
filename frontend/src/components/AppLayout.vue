@@ -58,7 +58,7 @@
         <router-link to="/freeze" class="nav-item"
           :class="{ active: $route.path.startsWith('/freeze') }" @click="mobileMenuOpen = false">
           <el-icon :size="18"><Lock /></el-icon>
-          <span class="nav-label">封存解封</span>
+          <span class="nav-label">封存管理</span>
         </router-link>
       </nav>
 

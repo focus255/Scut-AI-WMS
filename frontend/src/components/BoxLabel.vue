@@ -1,256 +1,230 @@
 <!--
-  入库箱单标签（看板标签）组件。
-  使用 Canvas 渲染完整标签，包含二维码和文字信息，宽高比约 1.4。
-  可直接下载为 PNG，也可用于打印。
+  入库箱单看板组件（一码到底，全程唯一标识）。
+  左二维码 + 右信息表，不含流程状态等动态数据。
 
   @author Focus
-  @date 2026-06-13
+  @date 2026-06-24
 -->
 <template>
-  <div class="box-label-wrapper" :style="{ maxWidth: displayWidth + 'px' }">
-    <canvas ref="canvasRef" class="box-label-canvas"></canvas>
-    <!-- 隐藏的下载用画布，保持原始分辨率 -->
+  <div class="kanban-card" ref="cardRef">
+    <!-- 二维码 -->
+    <canvas ref="qrCanvasRef" class="kanban-qr"></canvas>
+    <!-- 信息表 -->
+    <table class="kanban-table">
+      <tr>
+        <td class="k-label">物料号</td>
+        <td class="k-value">{{ info.materialCode }}</td>
+      </tr>
+      <tr>
+        <td class="k-label">供应商</td>
+        <td class="k-value">{{ info.supplierCode }}</td>
+      </tr>
+      <tr>
+        <td class="k-label">器具</td>
+        <td class="k-value">{{ displayPackType }}</td>
+      </tr>
+      <tr>
+        <td class="k-label">日期</td>
+        <td class="k-value">{{ dateStr }}</td>
+      </tr>
+      <tr>
+        <td class="k-label">数量</td>
+        <td class="k-value">{{ info.packCapacity }} 件/箱</td>
+      </tr>
+      <tr>
+        <td class="k-label">看板号</td>
+        <td class="k-value kanban-no">{{ barcode }}</td>
+      </tr>
+    </table>
+    <!-- 隐藏画布供PNG导出 -->
     <canvas ref="exportCanvasRef" style="display:none"></canvas>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import QRCodeLib from 'qrcode'
+import { getAppliances } from '@/api/appliances'
 
 const props = defineProps({
-  /** 完整条码字符串，格式: WMS|物料|供应商|计划数|箱容量|实收数|箱号 */
   barcode: { type: String, required: true },
-  /** 条码状态：待入库 / 在库 / 已出库 */
-  status: { type: String, default: '待入库' },
-  /** 关联入库单号 */
-  orderNo: { type: String, default: '' },
-  /** 创建时间（兼容 ISO 字符串和 Jackson 数组格式） */
+  packType: { type: String, default: '' },
   createdAt: { type: [String, Array], default: '' },
-  /** 标签类型：inbound（入库箱单） / outbound（出库箱单） */
-  type: { type: String, default: 'inbound' },
 })
 
-const canvasRef = ref(null)
+const qrCanvasRef = ref(null)
 const exportCanvasRef = ref(null)
+const resolvedPackType = ref('')
 
-// 画布实际尺寸（宽高比 1.4）
-const CANVAS_WIDTH = 420
-const CANVAS_HEIGHT = 300
-// CSS 显示宽度（可被父级覆盖）
-const displayWidth = 300
-
-/**
- * 解析条码字符串，提取各字段。
- * 入库格式: WMS|<materialCode>|<supplierCode>|<planQty>|<packCapacity>|<actualQty>|<boxSeq>
- * 出库格式: OUT|<materialCode>|<outboundOrderNo>|<packCapacity>|<planQty>|<boxQty>|<boxSeq>
- */
-function parseBarcode(str) {
-  const parts = (str || '').split('|')
-  const isOutbound = parts[0] === 'OUT'
+const info = computed(() => {
+  const parts = (props.barcode || '').split('|')
   return {
     materialCode: parts[1] || '—',
-    supplierCode: isOutbound ? '出库' : (parts[2] || '—'),
-    planQty: parseInt(parts[isOutbound ? 4 : 3]) || 0,
-    packCapacity: parseInt(parts[isOutbound ? 3 : 4]) || 0,
-    actualQty: isOutbound ? (parseInt(parts[5]) || 0) : (parseInt(parts[5]) || 0),
-    boxSeq: parseInt(parts[6]) || 1,
-    isOutbound,
+    supplierCode: parts[2] || '—',
+    packCapacity: parseInt(parts[4]) || 0,
   }
+})
+
+/** 显示用的器具类型（优先 prop，其次 API 查找） */
+const displayPackType = computed(() => props.packType || resolvedPackType.value || '—')
+
+/** 从条码解析的物料号+供应商查找器具类型 */
+async function resolvePackType() {
+  if (props.packType) { resolvedPackType.value = props.packType; return }
+  const mat = info.value.materialCode
+  const sup = info.value.supplierCode
+  if (mat === '—' || sup === '—') return
+  try {
+    const data = await getAppliances({ page: 1, size: 20, keyword: mat })
+    const match = (data.records || []).find(a => a.materialCode === mat && a.supplierCode === sup)
+    if (match) resolvedPackType.value = match.packType || ''
+  } catch { /* */ }
 }
 
-/**
- * 格式化日期值，兼容多种序列化格式。
- * - ISO 字符串: "2026-06-03T10:30:00" → "2026-06-03"
- * - Jackson 数组: [2026, 6, 3, 10, 30, 0] → "2026-06-03"
- * - 空值: 返回当前日期
- */
-function formatDate(value) {
-  if (!value) return new Date().toISOString().substring(0, 10)
-  if (typeof value === 'string') return value.substring(0, 10)
-  if (Array.isArray(value) && value.length >= 3) {
-    const [y, m, d] = value
-    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+const dateStr = computed(() => {
+  const v = props.createdAt
+  if (!v) return new Date().toISOString().substring(0, 10)
+  if (typeof v === 'string') return v.substring(0, 10)
+  if (Array.isArray(v) && v.length >= 3) {
+    return `${v[0]}-${String(v[1]).padStart(2, '0')}-${String(v[2]).padStart(2, '0')}`
   }
   return new Date().toISOString().substring(0, 10)
+})
+
+/** 渲染显示屏上的二维码 */
+async function renderDisplayQr() {
+  await nextTick()
+  const canvas = qrCanvasRef.value
+  if (!canvas || !props.barcode) return
+  const size = 108
+  canvas.width = size
+  canvas.height = size
+  try {
+    await QRCodeLib.toCanvas(canvas, props.barcode, {
+      width: size, margin: 1,
+      color: { dark: '#000', light: '#fff' },
+    })
+  } catch { /* ignore */ }
 }
 
-/**
- * 在画布上绘制完整标签。
- * @param {HTMLCanvasElement} canvas 目标画布
- */
-async function drawLabel(canvas) {
-  if (!canvas || !props.barcode) return
-
+/** 渲染 PNG 导出画布（左二维码 + 右表格） */
+async function renderExportCanvas() {
+  await nextTick()
+  const canvas = exportCanvasRef.value
+  if (!canvas) return
+  const W = 420, H = 210
+  canvas.width = W
+  canvas.height = H
   const ctx = canvas.getContext('2d')
-  canvas.width = CANVAS_WIDTH
-  canvas.height = CANVAS_HEIGHT
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, W, H)
 
-  const info = parseBarcode(props.barcode)
-  // 总箱数 = 计划数量 ÷ 单箱容量（向上取整）
-  const totalBoxes = info.packCapacity > 0
-    ? Math.ceil(info.planQty / info.packCapacity)
-    : 1
+  // 外框
+  ctx.strokeStyle = '#333'; ctx.lineWidth = 2
+  ctx.strokeRect(3, 3, W - 6, H - 6)
 
-  // ==================== 背景 ====================
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-
-  // ==================== 外边框 ====================
-  ctx.strokeStyle = '#2c3e50'
-  ctx.lineWidth = 2.5
-  ctx.strokeRect(2, 2, CANVAS_WIDTH - 4, CANVAS_HEIGHT - 4)
-
-  // 内边框（装饰线）
-  ctx.strokeStyle = '#bdc3c7'
-  ctx.lineWidth = 0.8
-  ctx.strokeRect(8, 8, CANVAS_WIDTH - 16, CANVAS_HEIGHT - 16)
-
-  // ==================== 标题栏 ====================
-  const isOutbound = props.type === 'outbound'
-  const titleY = 38
-  ctx.fillStyle = '#2c3e50'
-  ctx.font = 'bold 15px "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif'
-  ctx.textAlign = 'center'
-  ctx.fillText(isOutbound ? '智库 WMS — 出库箱单标签' : '智库 WMS — 入库箱单标签', CANVAS_WIDTH / 2, titleY)
-
-  // 标题下方分隔线
-  ctx.strokeStyle = '#2c3e50'
-  ctx.lineWidth = 1.2
-  ctx.beginPath()
-  ctx.moveTo(24, titleY + 8)
-  ctx.lineTo(CANVAS_WIDTH - 24, titleY + 8)
-  ctx.stroke()
-
-  // ==================== 左侧：二维码 ====================
-  const qrSize = 118
-  const qrX = 24
-  const qrY = 62
-
-  // 二维码背景框
+  // — 左侧二维码 —
+  const qrSize = 100, qrX = 18, qrY = 18
   ctx.fillStyle = '#f8f9fa'
-  ctx.fillRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8)
-  ctx.strokeStyle = '#dee2e6'
-  ctx.lineWidth = 1
-  ctx.strokeRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8)
-
-  // 渲染二维码到离屏 canvas 再绘制到主画布
+  ctx.fillRect(qrX - 2, qrY - 2, qrSize + 4, qrSize + 4)
+  ctx.strokeStyle = '#dee2e6'; ctx.lineWidth = 0.8
+  ctx.strokeRect(qrX - 2, qrY - 2, qrSize + 4, qrSize + 4)
   try {
     const qrCanvas = document.createElement('canvas')
     await QRCodeLib.toCanvas(qrCanvas, props.barcode, {
-      width: qrSize,
-      height: qrSize,
-      margin: 1,
-      color: { dark: '#000000', light: '#ffffff' },
+      width: qrSize, margin: 1,
+      color: { dark: '#000', light: '#fff' },
     })
-    ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize)
-  } catch {
-    // 二维码渲染失败时显示占位文字
-    ctx.fillStyle = '#e74c3c'
-    ctx.font = '11px "Microsoft YaHei", sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillText('二维码生成失败', qrX + qrSize / 2, qrY + qrSize / 2)
-  }
+    ctx.drawImage(qrCanvas, qrX, qrY)
+  } catch { /* ignore */ }
 
-  // ==================== 右侧：文字信息 ====================
-  const textX = 162
-  let textY = 72
-  const lineHeight = 22
-  const labelColor = '#7f8c8d'
-  const valueColor = '#2c3e50'
-
-  /**
-   * 绘制一行标签文字。
-   * @param {string} label 标签名
-   * @param {string} value 值
-   */
-  function drawInfoLine(label, value) {
-    ctx.textAlign = 'left'
-    ctx.fillStyle = labelColor
-    ctx.font = '12px "Microsoft YaHei", "PingFang SC", sans-serif'
-    ctx.fillText(label, textX, textY)
-    ctx.fillStyle = valueColor
-    ctx.font = 'bold 12px "Microsoft YaHei", "PingFang SC", sans-serif'
-    ctx.fillText(value, textX + 68, textY)
-    textY += lineHeight
-  }
-
-  drawInfoLine('物料编码：', info.materialCode)
-  drawInfoLine('供应商：', info.supplierCode)
-  drawInfoLine(isOutbound ? '出库单号：' : '入库单号：', props.orderNo || '—')
-  drawInfoLine('计划数量：', String(info.planQty))
-  drawInfoLine('单箱容量：', String(info.packCapacity))
-  drawInfoLine('箱　　号：', `${info.boxSeq} / ${totalBoxes}`)
-  drawInfoLine('状　　态：', props.status || '—')
-
-  // 日期行（使用 createdAt 或当前日期）
-  // createdAt 可能为 ISO 字符串 "2026-06-03T10:30:00"、数组 [2026,6,3,10,30,0] 或空
-  const dateStr = formatDate(props.createdAt)
-  drawInfoLine('日　　期：', dateStr)
-
-  // ==================== 底部条码字符串 ====================
-  const bottomY = CANVAS_HEIGHT - 26
-  ctx.strokeStyle = '#dee2e6'
-  ctx.lineWidth = 0.6
-  ctx.beginPath()
-  ctx.moveTo(24, bottomY - 10)
-  ctx.lineTo(CANVAS_WIDTH - 24, bottomY - 10)
-  ctx.stroke()
-
-  ctx.fillStyle = '#95a5a6'
-  ctx.font = '9px "Courier New", "Liberation Mono", monospace'
+  // 二维码下方文字
+  ctx.fillStyle = '#888'
+  ctx.font = '9px "Microsoft YaHei", sans-serif'
   ctx.textAlign = 'center'
-  // 截断过长条码，保留完整信息
-  const displayBarcode = props.barcode.length > 58
-    ? props.barcode.substring(0, 55) + '...'
-    : props.barcode
-  ctx.fillText(displayBarcode, CANVAS_WIDTH / 2, bottomY + 4)
+  ctx.fillText('扫一扫查看', qrX + qrSize / 2, qrY + qrSize + 16)
 
-  // 底部小字
-  ctx.fillStyle = '#bdc3c7'
-  ctx.font = '8px "Microsoft YaHei", sans-serif'
-  ctx.fillText('智库 WMS 仓储管理系统', CANVAS_WIDTH / 2, bottomY + 18)
+  // — 右侧信息表 —
+  const tx = 140, ty = 24, lh = 28
+  const rows = [
+    ['物料号', info.value.materialCode],
+    ['供应商', info.value.supplierCode],
+    ['器具', displayPackType.value],
+    ['日期', dateStr.value],
+    ['数量', info.value.packCapacity + ' 件/箱'],
+    ['看板号', props.barcode],
+  ]
+  rows.forEach((r, i) => {
+    const y = ty + i * lh
+    ctx.fillStyle = '#888'
+    ctx.font = '11px "Microsoft YaHei", sans-serif'
+    ctx.textAlign = 'left'
+    ctx.fillText(r[0], tx, y + 12)
+    ctx.fillStyle = '#222'
+    ctx.font = 'bold 12px "Microsoft YaHei", sans-serif'
+    ctx.fillText(r[1], tx + 62, y + 12)
+    // 分隔线
+    if (i > 0) {
+      ctx.strokeStyle = '#eee'; ctx.lineWidth = 0.4
+      ctx.beginPath(); ctx.moveTo(tx, y - 2); ctx.lineTo(W - 18, y - 2); ctx.stroke()
+    }
+  })
 }
 
-/**
- * 绘制到显示画布和导出画布。
- */
-async function render() {
-  await nextTick()
-  if (canvasRef.value) {
-    await drawLabel(canvasRef.value)
-  }
-  // 同步更新导出画布（供父组件通过 getCanvas 获取原始分辨率画布）
-  if (exportCanvasRef.value) {
-    await drawLabel(exportCanvasRef.value)
-  }
-}
+function getCanvas() { return exportCanvasRef.value }
 
-/**
- * 获取可用于导出的 canvas 元素（原始分辨率）。
- * @returns {HTMLCanvasElement|null}
- */
-function getCanvas() {
-  return exportCanvasRef.value || canvasRef.value
-}
-
-onMounted(() => { render() })
-watch(() => [props.barcode, props.status, props.orderNo, props.createdAt, props.type], () => { render() })
+onMounted(async () => { await resolvePackType(); renderDisplayQr(); renderExportCanvas() })
+watch(() => [props.barcode, props.packType, props.createdAt], async () => { await resolvePackType(); renderDisplayQr(); renderExportCanvas() })
 
 defineExpose({ getCanvas })
 </script>
 
 <style scoped>
-.box-label-wrapper {
-  display: inline-block;
-  line-height: 0;
-}
-.box-label-canvas {
+.kanban-card {
+  background: #fff;
+  border: 2px solid #2c3e50;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
   width: 100%;
-  height: auto;
-  display: block;
+  max-width: 420px;
+}
+.kanban-qr {
+  width: 100px;
+  height: 100px;
+  flex-shrink: 0;
+  border: 1px solid #eee;
   border-radius: 3px;
-  /* 屏幕显示时添加轻微阴影 */
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+  padding: 3px;
+  background: #fff;
+}
+.kanban-table {
+  flex: 1;
+  min-width: 0;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.kanban-table td {
+  padding: 2px 6px;
+  vertical-align: middle;
+}
+.k-label {
+  color: #888;
+  font-size: 11px;
+  white-space: nowrap;
+  width: 48px;
+}
+.k-value {
+  color: #222;
+  font-weight: 600;
+  font-size: 12px;
+}
+.kanban-no {
+  font-size: 10px;
+  font-family: "Courier New", monospace;
+  word-break: break-all;
 }
 </style>

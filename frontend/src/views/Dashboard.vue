@@ -377,6 +377,20 @@ function startAlertPolling() {
   }, 60000)
 }
 
+/** 从 WMS|... 条码中解析物料编码 */
+function parseMaterialFromBarcode(code) {
+  if (!code || !code.startsWith('WMS|')) return '—'
+  const parts = code.split('|')
+  return parts[1] || '—'
+}
+
+/** 从 WMS|... 条码中解析单箱容量 */
+function parseQtyFromBarcode(code) {
+  if (!code || !code.startsWith('WMS|')) return 0
+  const parts = code.split('|')
+  return parseInt(parts[4]) || 0
+}
+
 // ==================== 扫码操作（入库/出库/封存/解封，严格隔离） ====================
 async function onBarcodeScanned(code) {
   scanResult.value = null
@@ -414,9 +428,9 @@ async function onBarcodeScanned(code) {
           scanError.value = '出库标签不可封存，请扫描在库条码（WMS|...）'
           return
         }
-        await sealBarcodes({ barcodes: [code], freezeType: 'QUALITY', reason: '扫码封存' })
-        scanResult.value = { materialCode: '—', barcode: code }
-        ElMessage.success(`封存成功：${code}`)
+        await sealBarcodes({ barcodes: [code], freezeType: '扫码', reason: '扫码封存' })
+        scanResult.value = { materialCode: parseMaterialFromBarcode(code), qty: parseQtyFromBarcode(code), barcode: code }
+        ElMessage.success(`封存成功：${scanResult.value.materialCode}`)
         break
       }
       case 'unseal': {
@@ -425,8 +439,8 @@ async function onBarcodeScanned(code) {
           return
         }
         await unsealBarcode(code)
-        scanResult.value = { materialCode: '—', barcode: code }
-        ElMessage.success(`解封成功：${code}`)
+        scanResult.value = { materialCode: parseMaterialFromBarcode(code), qty: parseQtyFromBarcode(code), barcode: code }
+        ElMessage.success(`解封成功：${scanResult.value.materialCode}`)
         break
       }
     }

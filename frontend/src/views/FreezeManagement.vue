@@ -7,7 +7,7 @@
   <div class="page-container">
     <div class="content-block">
       <div class="block-header">
-        <span class="block-title">封存解封管理</span>
+        <span class="block-title">封存管理</span>
       </div>
 
       <!-- 工具栏 -->
@@ -27,7 +27,7 @@
 
       <!-- 封存记录表 -->
       <el-table :data="freezeList" stripe size="small" v-loading="loading"
-        empty-text="暂无封存记录">
+        empty-text="暂无封存记录" @row-click="openEditDialog" style="cursor: pointer">
         <el-table-column prop="barcode" label="条码号" min-width="240" show-overflow-tooltip />
         <el-table-column prop="materialCode" label="物料号" width="140" />
         <el-table-column label="状态" width="100" align="center">
@@ -56,14 +56,11 @@
       </el-table>
 
       <!-- 分页 -->
-      <div style="margin-top: 16px; display: flex; justify-content: flex-end">
+      <div style="margin-top: 12px; display: flex; justify-content: flex-end">
         <el-pagination
-          v-model:current-page="page"
-          v-model:page-size="size"
-          :page-sizes="[10, 20, 50]"
-          :total="total"
-          layout="total, sizes, prev, pager, next"
-          @size-change="loadList"
+          v-if="total > size"
+          :current-page="page" :page-size="size" :total="total"
+          layout="total, prev, pager, next" size="small"
           @current-change="loadList" />
       </div>
     </div>
@@ -78,6 +75,7 @@
           </el-form-item>
           <el-form-item label="封存类型" required>
             <el-select v-model="sealForm.freezeType" placeholder="选择封存类型" style="width: 100%">
+              <el-option label="扫码" value="扫码" />
               <el-option label="质量问题" value="QUALITY" />
               <el-option label="管理封存" value="ADMIN" />
               <el-option label="其他" value="OTHER" />
@@ -90,6 +88,46 @@
         <template #footer>
           <el-button @click="sealVisible = false">取消</el-button>
           <el-button type="primary" :loading="sealSubmitting" @click="handleSeal">确认封存</el-button>
+        </template>
+      </el-dialog>
+    </Teleport>
+
+    <!-- 编辑封存详情 -->
+    <Teleport to="body">
+      <el-dialog v-model="editVisible" title="封存详情" width="500px" destroy-on-close>
+        <el-form :model="editForm" label-width="80px" v-if="editForm.id">
+          <el-form-item label="条码号">
+            <span class="form-text">{{ editForm.barcode }}</span>
+          </el-form-item>
+          <el-form-item label="物料号">
+            <span class="form-text">{{ editForm.materialCode }}</span>
+          </el-form-item>
+          <el-form-item label="封存类型">
+            <el-select v-model="editForm.freezeType" style="width: 100%">
+              <el-option label="扫码" value="扫码" />
+              <el-option label="质量问题" value="QUALITY" />
+              <el-option label="管理封存" value="ADMIN" />
+              <el-option label="其他" value="OTHER" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="封存原因">
+            <el-input v-model="editForm.reason" maxlength="200" show-word-limit />
+          </el-form-item>
+          <el-form-item label="操作人">
+            <span class="form-text">{{ editForm.operator }}</span>
+          </el-form-item>
+          <el-form-item label="封存时间">
+            <span class="form-text">{{ editForm.freezeTime }}</span>
+          </el-form-item>
+          <el-form-item label="状态">
+            <span class="badge" :class="editForm.status === 'FROZEN' ? 'badge-warn' : 'badge-success'">
+              {{ editForm.status === 'FROZEN' ? '封存中' : '已解封' }}
+            </span>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="editVisible = false">关闭</el-button>
+          <el-button v-if="editForm.status === 'FROZEN'" type="success" @click="handleEditUnseal">解封</el-button>
         </template>
       </el-dialog>
     </Teleport>
@@ -112,7 +150,10 @@ const searchStatus = ref('')
 
 const sealVisible = ref(false)
 const sealSubmitting = ref(false)
-const sealForm = reactive({ barcodeInput: '', freezeType: 'QUALITY', reason: '' })
+const sealForm = reactive({ barcodeInput: '', freezeType: '扫码', reason: '' })
+
+const editVisible = ref(false)
+const editForm = reactive({ id: null, barcode: '', materialCode: '', freezeType: '', reason: '', operator: '', freezeTime: '', status: '' })
 
 onMounted(() => loadList())
 
@@ -160,6 +201,28 @@ async function handleSeal() {
   } finally { sealSubmitting.value = false }
 }
 
+function openEditDialog(row) {
+  editForm.id = row.id
+  editForm.barcode = row.barcode
+  editForm.materialCode = row.materialCode
+  editForm.freezeType = row.freezeType
+  editForm.reason = row.reason
+  editForm.operator = row.operator
+  editForm.freezeTime = row.freezeTime
+  editForm.status = row.status
+  editVisible.value = true
+}
+
+async function handleEditUnseal() {
+  try {
+    await ElMessageBox.confirm(`确定解封条码 ${editForm.barcode}？`, '确认解封', { type: 'warning' })
+    await request.post('/freeze/unseal', null, { params: { barcode: editForm.barcode } })
+    ElMessage.success('解封成功')
+    editVisible.value = false
+    loadList()
+  } catch { /* */ }
+}
+
 async function handleUnseal(row) {
   try {
     await ElMessageBox.confirm(`确定解封条码 ${row.barcode}？`, '确认解封', { type: 'warning' })
@@ -175,4 +238,5 @@ async function handleUnseal(row) {
 .badge-warn { background: #fdf6ec; color: #e6a23c; }
 .badge-success { background: #f0f9eb; color: #67c23a; }
 .muted-text { font-size: 12px; color: var(--text-secondary); }
+.form-text { font-size: 14px; color: var(--text-primary); }
 </style>

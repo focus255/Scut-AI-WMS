@@ -334,15 +334,10 @@
             <div v-for="bc in detailData.barcodes" :key="bc.barcode" class="label-card"
               @click="downloadLabel(bc, $event)">
               <div class="label-card-header">
-                <span class="barcode-status-tag" :class="bc.status === '在库' ? 'tag-in-stock' : 'tag-pending'">
-                  {{ bc.status }}
-                </span>
                 <el-icon :size="14" class="download-icon"><Download /></el-icon>
               </div>
               <BoxLabel :ref="el => setLabelRef(bc.barcode, el)"
                 :barcode="bc.barcode"
-                :status="bc.status"
-                :order-no="detailData.orderNo"
                 :created-at="bc.createdAt" />
             </div>
           </div>
@@ -507,8 +502,6 @@
               <div class="label-print-grid">
                 <div v-for="bc in printOrder.barcodes" :key="bc.barcode" class="label-print-item">
                   <BoxLabel :barcode="bc.barcode"
-                    :status="bc.status"
-                    :order-no="printOrder.orderNo"
                     :created-at="bc.createdAt" />
                 </div>
               </div>
@@ -731,15 +724,10 @@
             <div v-for="bc in outDetailData.barcodes" :key="bc.barcode" class="label-card"
               @click="downloadOutLabel(bc, $event)">
               <div class="label-card-header">
-                <span class="barcode-status-tag" :class="bc.status === '已出库' ? 'tag-in-stock' : 'tag-pending'">
-                  {{ bc.status }}
-                </span>
                 <el-icon :size="14" class="download-icon"><Download /></el-icon>
               </div>
               <BoxLabel :ref="el => setOutLabelRef(bc.barcode, el)"
                 :barcode="bc.barcode"
-                :status="bc.status"
-                :order-no="outDetailData.orderNo"
                 :created-at="bc.createdAt" />
             </div>
           </div>
@@ -2362,26 +2350,19 @@ function onOutEditDialogOpened() {
   gap: 12px;
 }
 .label-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 10px 6px;
-  background: #fff;
-  border: 1px solid var(--border-light);
-  border-radius: 4px;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: box-shadow 0.15s;
+  border-radius: 4px;
 }
 .label-card:hover {
-  border-color: var(--wms-primary);
   box-shadow: 0 1px 8px rgba(64, 158, 255, 0.18);
 }
 .label-card-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
-  padding: 0 2px;
+  padding: 4px 6px;
 }
 .download-icon {
   color: var(--text-secondary);

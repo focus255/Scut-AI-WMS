@@ -189,6 +189,22 @@ CREATE TABLE IF NOT EXISTS `ai_inventory_reports` (
   `updated_at`               DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- 17. 库存封存记录表
+CREATE TABLE IF NOT EXISTS `inventory_freezes` (
+  `id`            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+  `barcode_id`    BIGINT NOT NULL COMMENT '关联条码ID',
+  `material_code` VARCHAR(100) NOT NULL COMMENT '物料编码',
+  `barcode`       VARCHAR(150) NOT NULL COMMENT '条码号',
+  `freeze_type`   VARCHAR(50) NOT NULL DEFAULT 'QUALITY' COMMENT '封存类型: QUALITY/ADMIN/OTHER',
+  `reason`        VARCHAR(255) NOT NULL COMMENT '封存原因',
+  `operator`      VARCHAR(100) DEFAULT 'admin' COMMENT '操作人',
+  `freeze_time`   DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '封存时间',
+  `unfreeze_time` DATETIME DEFAULT NULL COMMENT '解封时间',
+  `status`        VARCHAR(50) NOT NULL DEFAULT 'FROZEN' COMMENT '状态: FROZEN/UNFROZEN',
+  `created_at`    DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 -- ===================================================================
 -- 种子数据由 DataInitializer.java 通过 JDBC 插入
 -- 避免 SQL 文件编码导致 H2 中文乱码
