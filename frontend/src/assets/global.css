@@ -60,6 +60,10 @@ html, body, #app {
   background: var(--main-bg);
   -webkit-font-smoothing: antialiased;
 }
+/* 手机端路由：背景透明，手机壳由 MobileLayout 渲染 */
+#app:has(.mobile-shell) {
+  background: transparent;
+}
 
 body {
   overflow: hidden;

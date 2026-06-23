@@ -4,9 +4,17 @@
   @date 2026-06-11
 -->
 <template>
-  <!-- ========== 摄像头扫码弹窗 ========== -->
+  <!-- ========== 内联模式：直接嵌入页面（手机端） ========== -->
+  <div v-if="inline">
+    <div :id="inlineCameraId" class="camera-container-inline"></div>
+    <div v-if="cameraError" class="scan-error-inline">
+      <el-icon :size="16"><WarningFilled /></el-icon><span>{{ cameraError }}</span>
+    </div>
+  </div>
+
+  <!-- ========== 摄像头扫码弹窗（PC端） ========== -->
   <Teleport to="body">
-    <el-dialog v-model="cameraVisible" title="扫二维码"
+    <el-dialog v-if="!inline" v-model="cameraVisible" title="扫二维码"
       width="min(520px, calc(100vw - 32px))" destroy-on-close
       @opened="startCamera" @closed="stopCamera">
       <div id="camera-scanner-area" class="camera-container"></div>
@@ -51,30 +59,43 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { WarningFilled, UploadFilled, Loading } from '@element-plus/icons-vue'
 import { Html5Qrcode } from 'html5-qrcode'
 
+const props = defineProps({
+  inline: { type: Boolean, default: false }
+})
+
 const emit = defineEmits(['scanned'])
+
+const inlineCameraId = 'inline-camera-' + Math.random().toString(36).substring(2, 8)
 
 // ==================== 摄像头 ====================
 const cameraVisible = ref(false)
 const cameraError = ref('')
 let html5QrCode = null
 
-async function startCamera() {
+async function startCamera(elementId) {
   cameraError.value = ''
+  const elId = elementId || 'camera-scanner-area'
   try {
-    html5QrCode = new Html5Qrcode('camera-scanner-area')
+    html5QrCode = new Html5Qrcode(elId)
     await html5QrCode.start(
       { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+      { fps: 10, qrbox: 250, aspectRatio: 1.0 },
       (text) => {
-        stopCamera()
-        emit('scanned', text)
-        cameraVisible.value = false
-        ElMessage.success(`识别成功：${text}`)
+        if (props.inline) {
+          // 内联模式：不关相机，持续扫码
+          emit('scanned', text)
+          ElMessage.success(`识别成功：${text}`)
+        } else {
+          stopCamera()
+          emit('scanned', text)
+          cameraVisible.value = false
+          ElMessage.success(`识别成功：${text}`)
+        }
       },
       () => {}
     )
@@ -119,6 +140,12 @@ async function handleImageUpload(file) {
 // ==================== 对外方法 ====================
 function openCamera() { cameraVisible.value = true }
 function openUpload() { uploadVisible.value = true }
+
+onMounted(() => {
+  if (props.inline) { startCamera(inlineCameraId) }
+})
+onUnmounted(() => { stopCamera() })
+
 defineExpose({ openCamera, openUpload })
 </script>
 
@@ -133,4 +160,10 @@ defineExpose({ openCamera, openUpload })
 .scan-error { margin-top: 12px; padding: 10px 14px; background: #fef0f0; border-radius: 4px; color: #f56c6c; font-size: 13px; display: flex; align-items: center; gap: 6px; }
 .dialog-footer { display: flex; align-items: center; justify-content: space-between; width: 100%; }
 .footer-tip { font-size: 12px; color: var(--text-secondary); }
+</style>
+
+<style>
+.camera-container-inline { width: 100%; height: min(45vh, 420px); background: #000; overflow: hidden; }
+.camera-container-inline video { width: 100%; height: 100% !important; object-fit: cover; }
+.scan-error-inline { padding: 8px 12px; background: #fef0f0; color: #f56c6c; font-size: 13px; display: flex; align-items: center; gap: 6px; }
 </style>

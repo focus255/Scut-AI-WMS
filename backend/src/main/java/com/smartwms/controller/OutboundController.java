@@ -1,5 +1,6 @@
 package com.smartwms.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.smartwms.common.Result;
 import com.smartwms.dto.ConfirmOutboundRequest;
@@ -9,7 +10,9 @@ import com.smartwms.dto.OutboundOrderVO;
 import com.smartwms.dto.ScanInboundRequest;
 import com.smartwms.dto.ScanResponse;
 import com.smartwms.dto.ScanInboundVO;
+import com.smartwms.entity.Barcode;
 import com.smartwms.entity.OutboundOrder;
+import com.smartwms.mapper.BarcodeMapper;
 import com.smartwms.service.InboundService;
 import com.smartwms.service.OutboundService;
 import jakarta.validation.Valid;
@@ -35,11 +38,14 @@ public class OutboundController {
 
     private final OutboundService outboundService;
     private final InboundService inboundService;
+    private final BarcodeMapper barcodeMapper;
 
     public OutboundController(OutboundService outboundService,
-                              InboundService inboundService) {
+                              InboundService inboundService,
+                              BarcodeMapper barcodeMapper) {
         this.outboundService = outboundService;
         this.inboundService = inboundService;
+        this.barcodeMapper = barcodeMapper;
     }
 
     /**
@@ -116,14 +122,25 @@ public class OutboundController {
      * 出库标签格式: OUT|<materialCode>|<outboundOrderNo>|<packCapacity>|<planQty>|<boxQty>|<boxSeq>
      * 入库条码格式: WMS|<materialCode>|<supplierCode>|<planQty>|<packCapacity>|<actualQty>|<boxSeq>
      */
+    /** 出库专用扫码（WMS条码，仅接受待出库状态） */
+    @PostMapping("/scan/wms")
+    public Result<ScanResponse> scanOutboundWms(@Valid @RequestBody ScanInboundRequest request) {
+        return Result.success("扫码出库成功", outboundService.scanOutbound(request.getBarcode().trim()));
+    }
+
     @PostMapping("/scan")
     public Result<ScanResponse> unifiedScan(@Valid @RequestBody ScanInboundRequest request) {
         String barcode = request.getBarcode().trim();
         if (barcode.startsWith("OUT|")) {
-            // 出库标签 → 扫码出库
             return Result.success("扫码出库成功", outboundService.scanOutbound(barcode));
         }
-        // 入库条码 → 扫码入库
+        // WMS 条码：按状态分派。待出库→出库核销，其他→入库核销
+        Barcode bc = barcodeMapper.selectOne(
+                new LambdaQueryWrapper<Barcode>().eq(Barcode::getBarcode, barcode)
+        );
+        if (bc != null && "待出库".equals(bc.getStatus())) {
+            return Result.success("扫码出库成功", outboundService.scanOutbound(barcode));
+        }
         ScanInboundVO inboundResult = inboundService.scanReceive(request);
         return Result.success("扫码入库成功", ScanResponse.inbound(inboundResult));
     }

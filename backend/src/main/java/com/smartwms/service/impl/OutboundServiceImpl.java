@@ -555,8 +555,12 @@ public class OutboundServiceImpl implements OutboundService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "该条码已出库，请勿重复扫码");
         }
         if (!"待出库".equals(inboundBc.getStatus())) {
+            if ("在库".equals(inboundBc.getStatus())) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST,
+                        "未创建出库单，禁止出库。请先在PC端出入库管理新建出库单");
+            }
             throw new BusinessException(ErrorCode.BAD_REQUEST,
-                    "条码当前状态为 " + inboundBc.getStatus() + "，仅「待出库」状态可扫码出库（请先创建出库单拣货）");
+                    "条码当前状态为「" + inboundBc.getStatus() + "」，不可出库");
         }
 
         String materialCode = inboundBc.getMaterialCode();

@@ -81,6 +81,27 @@ const routes = [
     ]
   },
   {
+    // 手机端
+    path: '/mobile',
+    component: () => import('@/components/MobileLayout.vue'),
+    meta: { noAuth: false },
+    children: [
+      {
+        path: '',
+        name: 'MobileHome',
+        component: () => import('@/views/MobileHome.vue'),
+        meta: { title: '智库WMS' }
+      },
+      {
+        path: 'scan/:mode',
+        name: 'MobileScanner',
+        component: () => import('@/views/MobileScanner.vue'),
+        meta: { title: '扫码' },
+        props: true
+      }
+    ]
+  },
+  {
     // 未匹配路由重定向到看板
     path: '/:pathMatch(.*)*',
     redirect: '/dashboard'
