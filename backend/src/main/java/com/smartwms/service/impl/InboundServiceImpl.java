@@ -1,5 +1,5 @@
 /**
- * 入库单服务实现。
+ * 入库单服务实现（整箱入库，单箱容量由器具配置决定）。
  *
  * @author Focus
  * @date 2026-06-03
@@ -44,6 +44,7 @@ public class InboundServiceImpl implements InboundService {
     private final InventoryMapper inventoryMapper;
     private final BarcodeMapper barcodeMapper;
     private final MaterialMapper materialMapper;
+    private final ApplianceMapper applianceMapper;
     private final OutboundHistoryMapper outboundHistoryMapper;
 
     public InboundServiceImpl(InboundOrderMapper inboundOrderMapper,
@@ -51,13 +52,32 @@ public class InboundServiceImpl implements InboundService {
                                InventoryMapper inventoryMapper,
                                BarcodeMapper barcodeMapper,
                                MaterialMapper materialMapper,
+                               ApplianceMapper applianceMapper,
                                OutboundHistoryMapper outboundHistoryMapper) {
         this.inboundOrderMapper = inboundOrderMapper;
         this.inboundDetailMapper = inboundDetailMapper;
         this.inventoryMapper = inventoryMapper;
         this.barcodeMapper = barcodeMapper;
         this.materialMapper = materialMapper;
+        this.applianceMapper = applianceMapper;
         this.outboundHistoryMapper = outboundHistoryMapper;
+    }
+
+    /**
+     * 根据物料编码和供应商查询器具包装容量。
+     * 若未找到器具配置则抛出业务异常。
+     */
+    private int getPackCapacity(String materialCode, String supplierCode) {
+        Appliance appliance = applianceMapper.selectOne(
+                new LambdaQueryWrapper<Appliance>()
+                        .eq(Appliance::getMaterialCode, materialCode)
+                        .eq(Appliance::getSupplierCode, supplierCode)
+        );
+        if (appliance == null || appliance.getPackCapacity() == null || appliance.getPackCapacity() <= 0) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST,
+                    "物料 " + materialCode + " 在供应商 " + supplierCode + " 下未配置器具包装容量，请先到器具管理页面配置。");
+        }
+        return appliance.getPackCapacity();
     }
 
     @Override
@@ -81,30 +101,39 @@ public class InboundServiceImpl implements InboundService {
         order.setSupplierCode(request.getSupplierCode());
         inboundOrderMapper.insert(order);
 
-        // 创建明细并生成条码
+        String supplierCode = request.getSupplierCode();
+
+        // 创建明细并生成条码（整箱，每箱一个条码）
         for (InboundOrderRequest.InboundDetailItem item : request.getDetails()) {
+            int packCapacity = getPackCapacity(item.getMaterialCode(), supplierCode);
+            int boxCount = item.getBoxCount() != null ? item.getBoxCount() : 0;
+            if (boxCount <= 0) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST,
+                        "物料 " + item.getMaterialCode() + " 的入库箱数必须大于 0");
+            }
+            int planQty = boxCount * packCapacity;
+
             InboundDetail detail = new InboundDetail();
             detail.setInboundId(order.getId());
             detail.setOrderNo(orderNo);
             detail.setMaterialCode(item.getMaterialCode());
-            detail.setPackCapacity(item.getPackCapacity());
-            detail.setPlanQty(item.getPlanQty());
+            detail.setPackCapacity(packCapacity);
+            detail.setPlanQty(planQty);
             detail.setActualQty(0);
             inboundDetailMapper.insert(detail);
 
-            // 按箱数生成条码，每箱时间错开以确保 FIFO 排序可区分
-            int boxCount = (int) Math.ceil((double) item.getPlanQty() / item.getPackCapacity());
+            // 每箱生成一条条码
             for (int i = 0; i < boxCount; i++) {
-                String barcodeStr = buildBarcode(item.getMaterialCode(), request.getSupplierCode(), item.getPlanQty(),
-                        item.getPackCapacity(), item.getPlanQty(), i + 1, orderNo);
+                String barcodeStr = buildBarcode(item.getMaterialCode(), supplierCode, planQty,
+                        packCapacity, planQty, i + 1, orderNo);
                 Barcode barcode = new Barcode();
                 barcode.setMaterialCode(item.getMaterialCode());
-                barcode.setSupplierCode(request.getSupplierCode());
+                barcode.setSupplierCode(supplierCode);
                 barcode.setBarcode(barcodeStr);
                 barcode.setStatus("待入库");
                 barcode.setInboundId(order.getId());
                 barcode.setType("inbound");
-                barcode.setRemainingQty(item.getPackCapacity());
+                barcode.setRemainingQty(packCapacity);
                 barcodeMapper.insert(barcode);
                 // 逐箱错开 1 秒，确保 FIFO 排序可区分
                 Barcode updateTime = new Barcode();
@@ -179,7 +208,7 @@ public class InboundServiceImpl implements InboundService {
             detail.setActualQty(actualQty);
             inboundDetailMapper.updateById(detail);
 
-            // 按入库单 ID 精确匹配条码，避免误更新其他入库单的同物料条码
+            // 按入库单 ID 精确匹配条码，更新状态为在库
             var barcodes = barcodeMapper.selectList(
                     new LambdaQueryWrapper<Barcode>()
                             .eq(Barcode::getInboundId, inboundId)
@@ -219,8 +248,10 @@ public class InboundServiceImpl implements InboundService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "已完成入库单不可修改");
         }
 
+        String supplierCode = request.getSupplierCode();
+
         // 更新供应商
-        order.setSupplierCode(request.getSupplierCode());
+        order.setSupplierCode(supplierCode);
         inboundOrderMapper.updateById(order);
 
         // 删除旧明细（按入库单 ID 精确删除）
@@ -235,30 +266,37 @@ public class InboundServiceImpl implements InboundService {
                         .eq(Barcode::getInboundId, id)
         );
 
-        // 重新创建明细和条码
+        // 重新创建明细和条码（整箱逻辑）
         String orderNo = order.getOrderNo();
         for (InboundOrderRequest.InboundDetailItem item : request.getDetails()) {
+            int packCapacity = getPackCapacity(item.getMaterialCode(), supplierCode);
+            int boxCount = item.getBoxCount() != null ? item.getBoxCount() : 0;
+            if (boxCount <= 0) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST,
+                        "物料 " + item.getMaterialCode() + " 的入库箱数必须大于 0");
+            }
+            int planQty = boxCount * packCapacity;
+
             InboundDetail detail = new InboundDetail();
             detail.setInboundId(order.getId());
             detail.setOrderNo(orderNo);
             detail.setMaterialCode(item.getMaterialCode());
-            detail.setPackCapacity(item.getPackCapacity());
-            detail.setPlanQty(item.getPlanQty());
+            detail.setPackCapacity(packCapacity);
+            detail.setPlanQty(planQty);
             detail.setActualQty(0);
             inboundDetailMapper.insert(detail);
 
-            int boxCount = (int) Math.ceil((double) item.getPlanQty() / item.getPackCapacity());
             for (int i = 0; i < boxCount; i++) {
-                String barcodeStr = buildBarcode(item.getMaterialCode(), request.getSupplierCode(), item.getPlanQty(),
-                        item.getPackCapacity(), item.getPlanQty(), i + 1, orderNo);
+                String barcodeStr = buildBarcode(item.getMaterialCode(), supplierCode, planQty,
+                        packCapacity, planQty, i + 1, orderNo);
                 Barcode barcode = new Barcode();
                 barcode.setMaterialCode(item.getMaterialCode());
-                barcode.setSupplierCode(request.getSupplierCode());
+                barcode.setSupplierCode(supplierCode);
                 barcode.setBarcode(barcodeStr);
                 barcode.setStatus("待入库");
                 barcode.setInboundId(order.getId());
                 barcode.setType("inbound");
-                barcode.setRemainingQty(item.getPackCapacity());
+                barcode.setRemainingQty(packCapacity);
                 barcodeMapper.insert(barcode);
                 // 逐箱错开 1 秒，确保 FIFO 排序可区分
                 Barcode updateTime2 = new Barcode();
@@ -418,6 +456,18 @@ public class InboundServiceImpl implements InboundService {
             supplierCode = material.getSupplierCode();
         }
 
+        // 优先从 Appliance 表获取 packCapacity，若条码自带的值更可靠则以条码为准
+        if (packCapacity <= 1) {
+            Appliance appliance = applianceMapper.selectOne(
+                    new LambdaQueryWrapper<Appliance>()
+                            .eq(Appliance::getMaterialCode, materialCode)
+                            .eq(Appliance::getSupplierCode, supplierCode)
+            );
+            if (appliance != null && appliance.getPackCapacity() != null && appliance.getPackCapacity() > 0) {
+                packCapacity = appliance.getPackCapacity();
+            }
+        }
+
         // 查找可复用的未入库订单（actualQty < planQty 说明还有未收完的）
         InboundOrder order = null;
         List<InboundDetail> pendingDetails = inboundDetailMapper.selectList(
@@ -462,7 +512,7 @@ public class InboundServiceImpl implements InboundService {
             inboundDetailMapper.insert(detail);
         }
 
-        // 创建条码记录
+        // 创建条码记录（整箱 remainingQty = packCapacity）
         Barcode barcode = new Barcode();
         barcode.setBarcode(barcodeStr);
         barcode.setMaterialCode(materialCode);
@@ -520,7 +570,7 @@ public class InboundServiceImpl implements InboundService {
             );
         }
 
-        // 确定实际入库数量
+        // 确定实际入库数量（默认为整箱容量）
         int actualQty = requestedQty != null ? requestedQty
                 : (detail != null && detail.getPackCapacity() != null ? detail.getPackCapacity() : 1);
 

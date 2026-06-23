@@ -128,13 +128,15 @@
           </el-form-item>
           <el-form-item label="物料明细" prop="details">
             <div class="detail-editor">
-              <div class="detail-head">
+              <div class="detail-head detail-head-6">
                 <span>物料号</span>
+                <span>器具类型</span>
                 <span>单箱容量</span>
-                <span>计划入库数</span>
+                <span>入库箱数</span>
+                <span>总数</span>
                 <span>操作</span>
               </div>
-              <div v-for="(item, idx) in inboundForm.details" :key="idx" class="detail-row">
+              <div v-for="(item, idx) in inboundForm.details" :key="idx" class="detail-row detail-row-6">
                 <el-select v-model="item.materialCode"
                   :placeholder="inboundForm.supplierCode ? '搜索物料号' : '请先选择供应商'"
                   size="small" filterable remote
@@ -146,10 +148,11 @@
                   <el-option v-for="m in materialOptions[idx]" :key="m.materialCode"
                     :label="`${m.materialCode} — ${m.materialName}`" :value="m.materialCode" />
                 </el-select>
-                <el-input-number v-model="item.packCapacity" :min="1" :max="999999" size="small"
+                <span class="readonly-cell" :title="item.packType">{{ item.packType || '—' }}</span>
+                <span class="readonly-cell">{{ item.packCapacity || '—' }}</span>
+                <el-input-number v-model="item.boxCount" :min="1" :max="999999" size="small"
                   controls-position="right" />
-                <el-input-number v-model="item.planQty" :min="1" :max="999999" size="small"
-                  controls-position="right" />
+                <span class="readonly-cell total-cell">{{ (item.boxCount || 0) * (item.packCapacity || 0) || '—' }}</span>
                 <el-button type="danger" link size="small" @click="removeDetail(idx)"
                   :disabled="inboundForm.details.length <= 1">
                   <el-icon :size="14"><Delete /></el-icon>
@@ -286,10 +289,10 @@
           </el-form-item>
           <el-form-item label="物料明细" prop="details">
             <div class="detail-editor">
-              <div class="detail-head">
-                <span>物料号</span><span>单箱容量</span><span>计划入库数</span><span>操作</span>
+              <div class="detail-head detail-head-6">
+                <span>物料号</span><span>器具类型</span><span>单箱容量</span><span>入库箱数</span><span>总数</span><span>操作</span>
               </div>
-              <div v-for="(item, idx) in editForm.details" :key="idx" class="detail-row">
+              <div v-for="(item, idx) in editForm.details" :key="idx" class="detail-row detail-row-6">
                 <el-select v-model="item.materialCode"
                   :placeholder="editForm.supplierCode ? '搜索物料号' : '请先选择供应商'"
                   size="small" filterable remote
@@ -301,8 +304,10 @@
                   <el-option v-for="m in editMaterialOptions[idx]" :key="m.materialCode"
                     :label="`${m.materialCode} — ${m.materialName}`" :value="m.materialCode" />
                 </el-select>
-                <el-input-number v-model="item.packCapacity" :min="1" :max="999999" size="small" controls-position="right" />
-                <el-input-number v-model="item.planQty" :min="1" :max="999999" size="small" controls-position="right" />
+                <span class="readonly-cell" :title="item.packType">{{ item.packType || '—' }}</span>
+                <span class="readonly-cell">{{ item.packCapacity || '—' }}</span>
+                <el-input-number v-model="item.boxCount" :min="1" :max="999999" size="small" controls-position="right" />
+                <span class="readonly-cell total-cell">{{ (item.boxCount || 0) * (item.packCapacity || 0) || '—' }}</span>
                 <el-button type="danger" link size="small" @click="removeEditDetail(idx)"
                   :disabled="editForm.details.length <= 1">
                   <el-icon :size="14"><Delete /></el-icon><span>删除</span>
@@ -390,24 +395,28 @@
         <el-form ref="outFormRef" :model="outboundForm" label-width="88px">
           <el-form-item label="物料明细" prop="details">
             <div class="detail-editor">
-              <div class="detail-head">
+              <div class="detail-head detail-head-6">
                 <span>物料号</span>
+                <span>器具类型</span>
                 <span>单箱容量</span>
-                <span>计划出库数</span>
+                <span>出库箱数</span>
+                <span>总数</span>
                 <span>操作</span>
               </div>
-              <div v-for="(item, idx) in outboundForm.details" :key="idx" class="detail-row">
+              <div v-for="(item, idx) in outboundForm.details" :key="idx" class="detail-row detail-row-6">
                 <el-select v-model="item.materialCode" placeholder="搜索物料号" size="small"
                   filterable remote :remote-method="(q) => searchOutMaterials(q, idx)"
                   :loading="outMaterialLoading[idx]" clearable style="width: 100%"
-                  @focus="searchOutMaterials('', idx)">
+                  @focus="searchOutMaterials('', idx)"
+                  @change="(val) => fetchOutPackCapacity(idx, val)">
                   <el-option v-for="m in outMaterialOptions[idx]" :key="m.materialCode"
                     :label="`${m.materialCode} — ${m.materialName}`" :value="m.materialCode" />
                 </el-select>
-                <el-input-number v-model="item.packCapacity" :min="1" :max="999999" size="small"
+                <span class="readonly-cell" :title="item.packType">{{ item.packType || '—' }}</span>
+                <span class="readonly-cell">{{ item.packCapacity || '—' }}</span>
+                <el-input-number v-model="item.boxCount" :min="1" :max="999999" size="small"
                   controls-position="right" />
-                <el-input-number v-model="item.planQty" :min="1" :max="999999" size="small"
-                  controls-position="right" />
+                <span class="readonly-cell total-cell">{{ (item.boxCount || 0) * (item.packCapacity || 0) || '—' }}</span>
                 <el-button type="danger" link size="small" @click="removeOutDetail(idx)"
                   :disabled="outboundForm.details.length <= 1">
                   <el-icon :size="14"><Delete /></el-icon>
@@ -569,19 +578,22 @@
         <el-form ref="outEditFormRef" :model="outEditForm" label-width="88px">
           <el-form-item label="物料明细" prop="details">
             <div class="detail-editor">
-              <div class="detail-head">
-                <span>物料号</span><span>单箱容量</span><span>计划出库数</span><span>操作</span>
+              <div class="detail-head detail-head-6">
+                <span>物料号</span><span>器具类型</span><span>单箱容量</span><span>出库箱数</span><span>总数</span><span>操作</span>
               </div>
-              <div v-for="(item, idx) in outEditForm.details" :key="idx" class="detail-row">
+              <div v-for="(item, idx) in outEditForm.details" :key="idx" class="detail-row detail-row-6">
                 <el-select v-model="item.materialCode" placeholder="搜索物料号" size="small"
                   filterable remote :remote-method="(q) => searchOutEditMaterials(q, idx)"
                   :loading="outEditMaterialLoading[idx]" clearable style="width: 100%"
-                  @focus="searchOutEditMaterials('', idx)">
+                  @focus="searchOutEditMaterials('', idx)"
+                  @change="(val) => fetchOutEditPackCapacity(idx, val)">
                   <el-option v-for="m in outEditMaterialOptions[idx]" :key="m.materialCode"
                     :label="`${m.materialCode} — ${m.materialName}`" :value="m.materialCode" />
                 </el-select>
-                <el-input-number v-model="item.packCapacity" :min="1" :max="999999" size="small" controls-position="right" />
-                <el-input-number v-model="item.planQty" :min="1" :max="999999" size="small" controls-position="right" />
+                <span class="readonly-cell" :title="item.packType">{{ item.packType || '—' }}</span>
+                <span class="readonly-cell">{{ item.packCapacity || '—' }}</span>
+                <el-input-number v-model="item.boxCount" :min="1" :max="999999" size="small" controls-position="right" />
+                <span class="readonly-cell total-cell">{{ (item.boxCount || 0) * (item.packCapacity || 0) || '—' }}</span>
                 <el-button type="danger" link size="small" @click="removeOutEditDetail(idx)"
                   :disabled="outEditForm.details.length <= 1">
                   <el-icon :size="14"><Delete /></el-icon><span>删除</span>
@@ -672,7 +684,7 @@ const isAiDraft = ref(false)
 
 const inboundForm = reactive({
   supplierCode: '',
-  details: [{ materialCode: '', packCapacity: 20, planQty: 200 }]
+  details: [{ materialCode: '', packType: '', packCapacity: 0, boxCount: 1 }]
 })
 const inboundRules = {
   supplierCode: [{ required: true, message: '请选择供应商', trigger: 'change' }]
@@ -691,7 +703,7 @@ const editMaterialOptions = ref({})
 const editMaterialLoading = ref({})
 const editForm = reactive({
   supplierCode: '',
-  details: [{ materialCode: '', packCapacity: 20, planQty: 200 }]
+  details: [{ materialCode: '', packType: '', packCapacity: 0, boxCount: 1 }]
 })
 
 // ==================== 确认入库 ====================
@@ -773,24 +785,32 @@ async function searchMaterials(query, idx) {
 }
 
 /**
- * 当物料被选中时，自动从器具配置获取包装容量。
+ * 当物料被选中时，自动从器具配置获取包装容量和器具类型（只读）。
  */
 async function fetchPackCapacity(idx, materialCode) {
-  if (!materialCode || !inboundForm.supplierCode) return
+  if (!materialCode || !inboundForm.supplierCode) {
+    inboundForm.details[idx].packType = ''
+    inboundForm.details[idx].packCapacity = 0
+    return
+  }
   try {
     const data = await getAppliances({ page: 1, size: 10, keyword: materialCode })
     const match = (data.records || []).find(
       a => a.materialCode === materialCode && a.supplierCode === inboundForm.supplierCode
     )
     if (match && match.packCapacity > 0) {
+      inboundForm.details[idx].packType = match.packType || ''
       inboundForm.details[idx].packCapacity = match.packCapacity
+    } else {
+      inboundForm.details[idx].packType = ''
+      inboundForm.details[idx].packCapacity = 0
     }
-  } catch { /* 获取失败时保留默认容量 */ }
+  } catch { /* 获取失败时保留默认值 */ }
 }
 
 // ==================== 新建入库单 ====================
 function addDetail() {
-  inboundForm.details.push({ materialCode: '', packCapacity: 20, planQty: 100 })
+  inboundForm.details.push({ materialCode: '', packType: '', packCapacity: 0, boxCount: 1 })
 }
 function removeDetail(idx) {
   if (inboundForm.details.length > 1) inboundForm.details.splice(idx, 1)
@@ -808,7 +828,7 @@ function onSupplierChange() {
 function openInboundDialog() {
   isAiDraft.value = false
   inboundForm.supplierCode = ''
-  inboundForm.details = [{ materialCode: '', packCapacity: 20, planQty: 200 }]
+  inboundForm.details = [{ materialCode: '', packType: '', packCapacity: 0, boxCount: 1 }]
   materialOptions.value = {}
   dialogVisible.value = true
 }
@@ -823,33 +843,36 @@ function applyAiInboundDraft() {
   inboundForm.supplierCode = ''
   inboundForm.details = [{
     materialCode,
-    packCapacity: 20,
-    planQty: suggestedQty
+    packType: '',
+    packCapacity: 0,
+    boxCount: 1
   }]
   materialOptions.value = {}
   dialogVisible.value = true
-  ElMessage.info('已根据 AI 建议预填入库明细，请选择供应商后保存')
+  ElMessage.info('已根据 AI 建议预填入库物料，请选择供应商后自动获取单箱容量')
 
   router.replace({ path: route.path, query: {} })
 }
 
 async function handleCreate() {
-  // 手动校验必填项，避免 ref 失效导致静默失败
+  // 手动校验必填项
   if (!inboundForm.supplierCode) {
     ElMessage.warning('请选择供应商')
     return
   }
   const invalidDetail = inboundForm.details.find(item =>
-    !item.materialCode?.trim() || !item.packCapacity || !item.planQty
+    !item.materialCode?.trim() || !item.boxCount || item.boxCount < 1 || !item.packCapacity || item.packCapacity < 1
   )
   if (invalidDetail) {
-    ElMessage.warning('请完整填写每一行物料明细（物料号、单箱容量、计划入库数）')
+    if (!invalidDetail.materialCode?.trim()) ElMessage.warning('请选择每行物料')
+    else if (!invalidDetail.packCapacity || invalidDetail.packCapacity < 1) ElMessage.warning('物料 ' + invalidDetail.materialCode + ' 未配置器具容量，请先到器具管理页面配置')
+    else ElMessage.warning('请完整填写每一行物料明细')
     return
   }
   try {
     await createInbound({
       supplierCode: inboundForm.supplierCode,
-      details: inboundForm.details
+      details: inboundForm.details.map(d => ({ materialCode: d.materialCode, boxCount: d.boxCount }))
     })
     ElMessage.success('入库单创建成功')
     dialogVisible.value = false
@@ -917,19 +940,27 @@ async function searchEditMaterials(query, idx) {
 }
 
 /**
- * 编辑对话框：当物料被选中时，自动从器具配置获取包装容量。
+ * 编辑对话框：当物料被选中时，自动从器具配置获取包装容量和器具类型。
  */
 async function fetchEditPackCapacity(idx, materialCode) {
-  if (!materialCode || !editForm.supplierCode) return
+  if (!materialCode || !editForm.supplierCode) {
+    editForm.details[idx].packType = ''
+    editForm.details[idx].packCapacity = 0
+    return
+  }
   try {
     const data = await getAppliances({ page: 1, size: 10, keyword: materialCode })
     const match = (data.records || []).find(
       a => a.materialCode === materialCode && a.supplierCode === editForm.supplierCode
     )
     if (match && match.packCapacity > 0) {
+      editForm.details[idx].packType = match.packType || ''
       editForm.details[idx].packCapacity = match.packCapacity
+    } else {
+      editForm.details[idx].packType = ''
+      editForm.details[idx].packCapacity = 0
     }
-  } catch { /* 获取失败时保留默认容量 */ }
+  } catch { /* 获取失败时保留默认值 */ }
 }
 
 /**
@@ -941,7 +972,7 @@ function onEditSupplierChange() {
 }
 
 function addEditDetail() {
-  editForm.details.push({ materialCode: '', packCapacity: 20, planQty: 100 })
+  editForm.details.push({ materialCode: '', packType: '', packCapacity: 0, boxCount: 1 })
 }
 function removeEditDetail(idx) {
   if (editForm.details.length > 1) editForm.details.splice(idx, 1)
@@ -956,11 +987,18 @@ async function openEditDialog(row) {
     editForm.supplierCode = data.supplierCode || ''
     editForm.details = (data.details || []).map(d => ({
       materialCode: d.materialCode || '',
-      packCapacity: d.packCapacity || 20,
-      planQty: d.planQty || 100
+      packType: '',
+      packCapacity: d.packCapacity || 0,
+      boxCount: (d.packCapacity > 0) ? Math.round((d.planQty || 0) / d.packCapacity) : 1
     }))
     if (editForm.details.length === 0) {
-      editForm.details = [{ materialCode: '', packCapacity: 20, planQty: 200 }]
+      editForm.details = [{ materialCode: '', packType: '', packCapacity: 0, boxCount: 1 }]
+    }
+    // 重新获取器具信息
+    for (let i = 0; i < editForm.details.length; i++) {
+      if (editForm.details[i].materialCode) {
+        await fetchEditPackCapacity(i, editForm.details[i].materialCode)
+      }
     }
     editVisible.value = true
   } catch {
@@ -969,23 +1007,24 @@ async function openEditDialog(row) {
 }
 
 async function handleEditSubmit() {
-  // 手动校验必填项，避免 ref 失效导致静默失败
   if (!editForm.supplierCode) {
     ElMessage.warning('请选择供应商')
     return
   }
   const invalid = editForm.details.find(d =>
-    !d.materialCode?.trim() || !d.packCapacity || !d.planQty
+    !d.materialCode?.trim() || !d.boxCount || d.boxCount < 1 || !d.packCapacity || d.packCapacity < 1
   )
   if (invalid) {
-    ElMessage.warning('请完整填写每一行物料明细（物料号、单箱容量、计划入库数）')
+    if (!invalid.materialCode?.trim()) ElMessage.warning('请选择每行物料')
+    else if (!invalid.packCapacity || invalid.packCapacity < 1) ElMessage.warning('物料 ' + invalid.materialCode + ' 未配置器具容量')
+    else ElMessage.warning('请完整填写每一行物料明细')
     return
   }
   editSubmitting.value = true
   try {
     await updateInbound(editTarget.value.id, {
       supplierCode: editForm.supplierCode,
-      details: editForm.details
+      details: editForm.details.map(d => ({ materialCode: d.materialCode, boxCount: d.boxCount }))
     })
     ElMessage.success('入库单修改成功')
     editVisible.value = false
@@ -1166,18 +1205,18 @@ const outMaterialOptions = ref({})
 const outMaterialLoading = ref({})
 
 const outboundForm = reactive({
-  details: [{ materialCode: '', packCapacity: 20, planQty: 200 }]
+  details: [{ materialCode: '', packType: '', packCapacity: 0, boxCount: 1 }]
 })
 
 function addOutDetail() {
-  outboundForm.details.push({ materialCode: '', packCapacity: 20, planQty: 100 })
+  outboundForm.details.push({ materialCode: '', packType: '', packCapacity: 0, boxCount: 1 })
 }
 function removeOutDetail(idx) {
   if (outboundForm.details.length > 1) outboundForm.details.splice(idx, 1)
 }
 
 function openOutboundDialog() {
-  outboundForm.details = [{ materialCode: '', packCapacity: 20, planQty: 200 }]
+  outboundForm.details = [{ materialCode: '', packType: '', packCapacity: 0, boxCount: 1 }]
   outMaterialOptions.value = {}
   outDialogVisible.value = true
 }
@@ -1194,16 +1233,40 @@ async function searchOutMaterials(query, idx) {
   }
 }
 
-async function handleOutCreate() {
-  const invalid = outboundForm.details.find(item =>
-    !item.materialCode?.trim() || !item.packCapacity || !item.planQty
-  )
-  if (invalid) {
-    ElMessage.warning('请完整填写每一行物料明细')
+/**
+ * 出库：当物料被选中时，从器具配置获取包装容量（使用物料默认供应商）。
+ */
+async function fetchOutPackCapacity(idx, materialCode) {
+  if (!materialCode) {
+    outboundForm.details[idx].packType = ''
+    outboundForm.details[idx].packCapacity = 0
     return
   }
   try {
-    await createOutbound({ details: outboundForm.details })
+    const data = await getAppliances({ page: 1, size: 20, keyword: materialCode })
+    const match = (data.records || []).find(a => a.materialCode === materialCode)
+    if (match && match.packCapacity > 0) {
+      outboundForm.details[idx].packType = match.packType || ''
+      outboundForm.details[idx].packCapacity = match.packCapacity
+    } else {
+      outboundForm.details[idx].packType = ''
+      outboundForm.details[idx].packCapacity = 0
+    }
+  } catch { /* */ }
+}
+
+async function handleOutCreate() {
+  const invalid = outboundForm.details.find(item =>
+    !item.materialCode?.trim() || !item.boxCount || item.boxCount < 1 || !item.packCapacity || item.packCapacity < 1
+  )
+  if (invalid) {
+    if (!invalid.materialCode?.trim()) ElMessage.warning('请选择每行物料')
+    else if (!invalid.packCapacity || invalid.packCapacity < 1) ElMessage.warning('物料 ' + invalid.materialCode + ' 未配置器具容量，请先到器具管理页面配置')
+    else ElMessage.warning('请完整填写每一行物料明细')
+    return
+  }
+  try {
+    await createOutbound({ details: outboundForm.details.map(d => ({ materialCode: d.materialCode, boxCount: d.boxCount })) })
     ElMessage.success('出库单创建成功')
     outDialogVisible.value = false
     loadOutboundOrders()
@@ -1220,10 +1283,10 @@ const outEditSubmitting = ref(false)
 const outEditMaterialOptions = ref({})
 const outEditMaterialLoading = ref({})
 const outEditForm = reactive({
-  details: [{ materialCode: '', packCapacity: 20, planQty: 200 }]
+  details: [{ materialCode: '', packType: '', packCapacity: 0, boxCount: 1 }]
 })
 
-function addOutEditDetail() { outEditForm.details.push({ materialCode: '', packCapacity: 20, planQty: 100 }) }
+function addOutEditDetail() { outEditForm.details.push({ materialCode: '', packType: '', packCapacity: 0, boxCount: 1 }) }
 function removeOutEditDetail(idx) { if (outEditForm.details.length > 1) outEditForm.details.splice(idx, 1) }
 
 async function searchOutEditMaterials(query, idx) {
@@ -1235,6 +1298,28 @@ async function searchOutEditMaterials(query, idx) {
   finally { outEditMaterialLoading.value[idx] = false }
 }
 
+/**
+ * 出库编辑：当物料被选中时，从器具配置获取包装容量。
+ */
+async function fetchOutEditPackCapacity(idx, materialCode) {
+  if (!materialCode) {
+    outEditForm.details[idx].packType = ''
+    outEditForm.details[idx].packCapacity = 0
+    return
+  }
+  try {
+    const data = await getAppliances({ page: 1, size: 20, keyword: materialCode })
+    const match = (data.records || []).find(a => a.materialCode === materialCode)
+    if (match && match.packCapacity > 0) {
+      outEditForm.details[idx].packType = match.packType || ''
+      outEditForm.details[idx].packCapacity = match.packCapacity
+    } else {
+      outEditForm.details[idx].packType = ''
+      outEditForm.details[idx].packCapacity = 0
+    }
+  } catch { /* */ }
+}
+
 async function openOutEditDialog(row) {
   outEditTarget.value = row
   outEditSubmitting.value = false
@@ -1243,11 +1328,18 @@ async function openOutEditDialog(row) {
     const data = await getOutboundDetail(row.id)
     outEditForm.details = (data.details || []).map(d => ({
       materialCode: d.materialCode || '',
-      packCapacity: d.packCapacity || 20,
-      planQty: d.planQty || 100
+      packType: '',
+      packCapacity: d.packCapacity || 0,
+      boxCount: (d.packCapacity > 0) ? Math.round((d.planQty || 0) / d.packCapacity) : 1
     }))
     if (outEditForm.details.length === 0) {
-      outEditForm.details = [{ materialCode: '', packCapacity: 20, planQty: 200 }]
+      outEditForm.details = [{ materialCode: '', packType: '', packCapacity: 0, boxCount: 1 }]
+    }
+    // 重新获取器具信息
+    for (let i = 0; i < outEditForm.details.length; i++) {
+      if (outEditForm.details[i].materialCode) {
+        await fetchOutEditPackCapacity(i, outEditForm.details[i].materialCode)
+      }
     }
     outEditVisible.value = true
   } catch { ElMessage.error('加载出库单详情失败') }
@@ -1255,12 +1347,17 @@ async function openOutEditDialog(row) {
 
 async function handleOutEditSubmit() {
   const invalid = outEditForm.details.find(d =>
-    !d.materialCode?.trim() || !d.packCapacity || !d.planQty
+    !d.materialCode?.trim() || !d.boxCount || d.boxCount < 1 || !d.packCapacity || d.packCapacity < 1
   )
-  if (invalid) { ElMessage.warning('请完整填写每一行物料明细'); return }
+  if (invalid) {
+    if (!invalid.materialCode?.trim()) ElMessage.warning('请选择每行物料')
+    else if (!invalid.packCapacity || invalid.packCapacity < 1) ElMessage.warning('物料 ' + invalid.materialCode + ' 未配置器具容量')
+    else ElMessage.warning('请完整填写每一行物料明细')
+    return
+  }
   outEditSubmitting.value = true
   try {
-    await updateOutbound(outEditTarget.value.id, { details: outEditForm.details })
+    await updateOutbound(outEditTarget.value.id, { details: outEditForm.details.map(d => ({ materialCode: d.materialCode, boxCount: d.boxCount })) })
     ElMessage.success('出库单修改成功')
     outEditVisible.value = false
     loadOutboundOrders()
@@ -1457,23 +1554,52 @@ async function loadHistories() {
 }
 .detail-head {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 128px 140px 74px;
+  grid-template-columns: minmax(160px, 1fr) 100px 90px 110px 110px 74px;
   gap: 8px;
   margin-bottom: 6px;
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.4;
 }
+.detail-head-6 {
+  grid-template-columns: minmax(140px, 1fr) 90px 80px 100px 100px 74px;
+}
 .detail-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 128px 140px 74px;
+  grid-template-columns: minmax(160px, 1fr) 100px 90px 110px 110px 74px;
   align-items: center;
   gap: 8px;
   min-width: 0;
   margin-bottom: 10px;
 }
+.detail-row-6 {
+  grid-template-columns: minmax(140px, 1fr) 90px 80px 100px 100px 74px;
+}
 .detail-row :deep(.el-input-number) {
   width: 100%;
+}
+/* 只读单元格：器具类型、单箱容量、总数 */
+.readonly-cell {
+  font-size: 13px;
+  color: var(--text-primary);
+  padding: 4px 8px;
+  background: #f5f7fa;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.total-cell {
+  font-weight: 600;
+  color: var(--wms-primary);
+  background: #ecf5ff;
+  border-color: #d9ecff;
 }
 .detail-row :deep(.el-input__wrapper) {
   min-width: 0;
@@ -1703,10 +1829,10 @@ async function loadHistories() {
   .summary-stats {
     flex-wrap: wrap;
   }
-  .detail-head {
+  .detail-head, .detail-head-6 {
     display: none;
   }
-  .detail-row {
+  .detail-row, .detail-row-6 {
     grid-template-columns: 1fr;
     padding: 10px;
     border: 1px solid var(--border-light);

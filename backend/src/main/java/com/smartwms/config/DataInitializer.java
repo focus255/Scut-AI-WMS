@@ -343,24 +343,30 @@ public class DataInitializer implements CommandLineRunner {
      *   - 超高储（黄色）：6 种 → 看板"呆滞物料数"=6（含 AI 滞销报告的物料）
      *   - 正常：4 种
      */
+    /**
+     * 所有 stockQty 必须是 packCapacity 的整倍数（整箱模式）。
+     */
     private void seedInventories() {
-        insertInventory("M_PART_001", 200, 3, 15);
-        insertInventory("M_PART_002", 180, 3, 15);
-        insertInventory("M_PART_003", 300, 5, 20);
-        insertInventory("M_PART_008", 500, 3, 10);
-        insertInventory("M_PART_011", 250, 3, 15);
-        insertInventory("M_PART_014", 400, 3, 10);
+        // 正常水位（packCapacity=20/50/15/30/50）—— 保持整箱
+        insertInventory("M_PART_001", 200, 3, 15);  // 20×10 ✅
+        insertInventory("M_PART_002", 180, 3, 15);  // 20×9 ✅
+        insertInventory("M_PART_003", 300, 5, 20);  // 50×6 ✅
+        insertInventory("M_PART_008", 510, 3, 10);  // 15×34（原500→510整箱）
+        insertInventory("M_PART_011", 240, 3, 15);  // 30×8（原250→240整箱）
+        insertInventory("M_PART_014", 400, 3, 10);  // 50×8 ✅
 
-        insertInventory("M_PART_004", 50, 7, 30);
-        insertInventory("M_PART_005", 15, 3, 15);
-        insertInventory("M_PART_009", 8, 3, 15);
-        insertInventory("M_PART_012", 5, 3, 15);
-        insertInventory("M_PART_015", 20, 3, 15);
+        // 超低储（红色预警）
+        insertInventory("M_PART_004", 50, 7, 30);   // 10×5 ✅
+        insertInventory("M_PART_005", 40, 3, 15);   // 40×1（原15→40整箱）
+        insertInventory("M_PART_009", 60, 3, 15);   // 60×1（原8→60整箱）
+        insertInventory("M_PART_012", 25, 3, 15);   // 25×1（原5→25整箱）
+        insertInventory("M_PART_015", 40, 3, 15);   // 40×1（原20→40整箱）
 
-        insertInventory("M_PART_006", 80, 5, 20);
-        insertInventory("M_PART_007", 35, 3, 12);
-        insertInventory("M_PART_010", 120, 5, 20);
-        insertInventory("M_PART_013", 90, 5, 25);
+        // 正常水位
+        insertInventory("M_PART_006", 84, 5, 20);   // 12×7（原80→84整箱）
+        insertInventory("M_PART_007", 40, 3, 12);   // 8×5（原35→40整箱）
+        insertInventory("M_PART_010", 120, 5, 20);  // 10×12 ✅
+        insertInventory("M_PART_013", 96, 5, 25);   // 16×6（原90→96整箱）
     }
 
     private void insertInventory(String code, int qty, int minDays, int maxDays) {
@@ -442,13 +448,11 @@ public class DataInitializer implements CommandLineRunner {
             detail.setActualQty(stockQty);
             inboundDetailMapper.insert(detail);
 
-            // 生成条码（每箱一个，时间逐毫秒递增）
-            int boxCount = (int) Math.ceil((double) stockQty / packCapacity);
+            // 生成条码（每箱一个，整箱模式：每箱 remainingQty = packCapacity）
+            int boxCount = stockQty / packCapacity; // 整箱模式确保整除
             for (int boxSeq = 1; boxSeq <= boxCount; boxSeq++) {
-                int lastQty = stockQty - packCapacity * (boxCount - 1);
-                int actualQty = (boxSeq < boxCount) ? packCapacity : (lastQty > 0 ? lastQty : packCapacity);
                 String barcode = String.format("WMS|%s|%s|%d|%d|%d|%d",
-                        materialCode, supplierCode, stockQty, packCapacity, actualQty, boxSeq);
+                        materialCode, supplierCode, stockQty, packCapacity, packCapacity, boxSeq);
 
                 Barcode bc = new Barcode();
                 bc.setMaterialCode(materialCode);
@@ -457,8 +461,7 @@ public class DataInitializer implements CommandLineRunner {
                 bc.setInboundId(order.getId());
                 bc.setType("inbound");
                 bc.setStatus("在库");
-                bc.setRemainingQty((boxSeq < boxCount) ? packCapacity
-                        : (lastQty > 0 ? lastQty : packCapacity));
+                bc.setRemainingQty(packCapacity); // 整箱
                 barcodeMapper.insert(bc);
 
                 // 每箱错开 1 毫秒，确保同物料内 FIFO 可区分
@@ -477,38 +480,38 @@ public class DataInitializer implements CommandLineRunner {
     private void seedAiReports() {
         LocalDateTime now = LocalDateTime.now();
 
-        // 1. 超高储物料 → AI 诊断为滞销风险
-        insertAiReport("M_PART_008", 500, "DEAD_STOCK", "MEDIUM", "SUCCESS", 0, 0.88f,
-                "该燃油泵模块当前库存高达500件，远超高储阈值（10天×10件/天=100件）。近30日仅出库20件，库存周转天数超过700天，资金占用严重。结合未来需求预测，短期内无大规模消耗计划，存在明确的呆滞积压风险。",
+        // 1. 超高储物料 → AI 诊断为滞销风险（库存已修正为整箱：15×34=510）
+        insertAiReport("M_PART_008", 510, "DEAD_STOCK", "MEDIUM", "SUCCESS", 0, 0.88f,
+                "该燃油泵模块当前库存高达510件（34个整箱），远超高储阈值（10天×10件/天=100件）。近30日仅出库30件，库存周转天数超过500天，资金占用严重。结合未来需求预测，短期内无大规模消耗计划，存在明确的呆滞积压风险。",
                 "建议立即暂停该物料采购计划，优先消耗现有库存。可考虑与供应商协商退货或调拨至其他工厂。建议将高储天数调整至10天以内，建立库存消化跟踪机制。",
                 now.minusHours(2));
 
-        // 2. 严重超低储 → AI 建议紧急补货
-        insertAiReport("M_PART_005", 15, "LOW_STOCK", "CRITICAL", "SUCCESS", 200, 0.95f,
-                "刹车片组件当前库存仅15件，已严重跌破低储安全线（3天×10件/天=30件）。按未来15天排产预测（总需求160件），库存将在1.5天内完全耗尽，导致总装线停产风险。属于最高优先级断供预警。",
+        // 2. 严重超低储 → AI 建议紧急补货（库存已修正为整箱：40×1=40）
+        insertAiReport("M_PART_005", 40, "LOW_STOCK", "CRITICAL", "SUCCESS", 200, 0.95f,
+                "刹车片组件当前库存仅40件（1个整箱），已严重跌破低储安全线（3天×10件/天=30件）。按未来15天排产预测（总需求160件），库存将在4天内完全耗尽，导致总装线停产风险。属于最高优先级断供预警。",
                 "建议立即向供应商SUP_BOSCH_01发起紧急补货订单。推荐补货量200件（标准铁箱5箱），预计可恢复至15天安全水位。建议同步启用安全库存缓冲机制。",
                 now.minusHours(3));
 
-        // 3. 另一超低储 → AI 双重风险（断供+滞销都有迹象）
-        insertAiReport("M_PART_012", 5, "BOTH", "CRITICAL", "SUCCESS", 150, 0.91f,
-                "ESP车身稳定模块库存仅剩5件，已触发极端低储警报。同时该物料近15天无出库记录，存在需求波动导致的供需错配风险——若需求突然启动，将无法满足。",
+        // 3. 另一超低储 → AI 双重风险（断供+滞销都有迹象，库存已修正为整箱：25×1=25）
+        insertAiReport("M_PART_012", 25, "BOTH", "CRITICAL", "SUCCESS", 150, 0.91f,
+                "ESP车身稳定模块库存仅剩25件（1个整箱），已触发极端低储警报。同时该物料近15天无出库记录，存在需求波动导致的供需错配风险——若需求突然启动，将无法满足。",
                 "建议紧急补货150件至基础安全线。同时与计划部门确认未来两周是否有该车型排产计划，若无则标记为潜在呆滞观察对象。",
                 now.minusHours(1));
 
-        // 4. Mock 兜底报告（大模型超时降级产物）
-        insertAiReport("M_PART_009", 8, "LOW_STOCK", "HIGH", "MOCKED", 92, 0.6f,
-                "[降级引擎Mock提示]: 由于外部AI推演大模型服务连线超时，系统自动执行基本精益规则扫描。当前库存已跌破低储天数标准线（3天×10件/天=30件，现仅8件），预测未来需求存在供应缺口，产生基础断供风险。",
-                "建议向供应商发起紧急补货。推荐补货量：92件，可将库存恢复至低储安全线以上。",
+        // 4. Mock 兜底报告（大模型超时降级产物，库存已修正为整箱：60×1=60）
+        insertAiReport("M_PART_009", 60, "LOW_STOCK", "HIGH", "MOCKED", 120, 0.6f,
+                "[降级引擎Mock提示]: 由于外部AI推演大模型服务连线超时，系统自动执行基本精益规则扫描。当前库存已跌破低储天数标准线（3天×10件/天=30件，现仅60件=1个整箱），预测未来需求存在供应缺口，产生基础断供风险。",
+                "建议向供应商发起紧急补货。推荐补货量：120件（2个整箱），可将库存恢复至低储安全线以上。",
                 now.minusMinutes(30));
 
-        // 5. 正常物料 → AI 确认无风险
-        insertAiReport("M_PART_006", 80, "NORMAL", "LOW", "SUCCESS", 0, 0.97f,
-                "空调压缩机当前库存80件，处于安全水位区间（低储50件~高储200件）。近30日出库稳定，日均消耗约8件，库存可维持约10天。未来需求预测无明显波动。整体库存健康度良好，无需干预。",
+        // 5. 正常物料 → AI 确认无风险（库存已修正为整箱：12×7=84）
+        insertAiReport("M_PART_006", 84, "NORMAL", "LOW", "SUCCESS", 0, 0.97f,
+                "空调压缩机当前库存84件（7个整箱），处于安全水位区间（低储50件~高储200件）。近30日出库稳定，日均消耗约8件，库存可维持约10天。未来需求预测无明显波动。整体库存健康度良好，无需干预。",
                 "维持当前采购节奏，按周例行检查库存水位即可。",
                 now.minusDays(1));
 
-        // 6. PENDING 状态报告（模拟正在等待 AI 分析）
-        insertAiReport("M_PART_015", 20, "NORMAL", "LOW", "PENDING", 0, 0f,
+        // 6. PENDING 状态报告（模拟正在等待 AI 分析，库存已修正为整箱：40×1=40）
+        insertAiReport("M_PART_015", 40, "NORMAL", "LOW", "PENDING", 0, 0f,
                 "分析中...", "分析中...", now.minusMinutes(5));
     }
 
@@ -598,11 +601,10 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     /**
-     * 为一条入库明细生成条码记录。
-     * 逻辑与 InboundServiceImpl.create() 一致：按箱数拆分。
+     * 为一条入库明细生成条码记录（整箱模式）。
      */
     private void seedBarcodes(InboundOrder order, InboundDetail detail, String status) {
-        int boxCount = (int) Math.ceil((double) detail.getPlanQty() / detail.getPackCapacity());
+        int boxCount = detail.getPlanQty() / detail.getPackCapacity();
         for (int i = 0; i < boxCount; i++) {
             Barcode bc = new Barcode();
             bc.setMaterialCode(detail.getMaterialCode());
@@ -613,10 +615,11 @@ public class DataInitializer implements CommandLineRunner {
                     order.getSupplierCode(),
                     detail.getPlanQty(),
                     detail.getPackCapacity(),
-                    detail.getPlanQty(),
+                    detail.getPackCapacity(),
                     i + 1));
             bc.setStatus(status);
             bc.setInboundId(order.getId());
+            bc.setRemainingQty(detail.getPackCapacity()); // 整箱
             barcodeMapper.insert(bc);
         }
     }
