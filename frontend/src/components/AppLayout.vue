@@ -33,7 +33,7 @@
         <router-link to="/inbound-outbound" class="nav-item"
           :class="{ active: $route.path.startsWith('/inbound-outbound') }" @click="mobileMenuOpen = false">
           <el-icon :size="18"><Switch /></el-icon>
-          <span class="nav-label">入库与出库管理</span>
+          <span class="nav-label">出入库管理</span>
         </router-link>
         <router-link to="/stock-report" class="nav-item"
           :class="{ active: $route.path.startsWith('/stock-report') }" @click="mobileMenuOpen = false">
@@ -53,7 +53,7 @@
         <router-link to="/inbound-history" class="nav-item"
           :class="{ active: $route.path.startsWith('/inbound-history') }" @click="mobileMenuOpen = false">
           <el-icon :size="18"><Clock /></el-icon>
-          <span class="nav-label">入库历史</span>
+          <span class="nav-label">出入库历史</span>
         </router-link>
         <router-link to="/scan" class="nav-item"
           :class="{ active: $route.path.startsWith('/scan') }" @click="mobileMenuOpen = false">

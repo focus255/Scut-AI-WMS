@@ -15,6 +15,9 @@ import com.smartwms.entity.InboundDetail;
 import com.smartwms.entity.InboundOrder;
 import com.smartwms.entity.Inventory;
 import com.smartwms.entity.Material;
+import com.smartwms.entity.OutboundDetail;
+import com.smartwms.entity.OutboundHistory;
+import com.smartwms.entity.OutboundOrder;
 import com.smartwms.entity.Permission;
 import com.smartwms.entity.Role;
 import com.smartwms.entity.RolePermission;
@@ -28,6 +31,9 @@ import com.smartwms.mapper.InboundDetailMapper;
 import com.smartwms.mapper.InboundOrderMapper;
 import com.smartwms.mapper.InventoryMapper;
 import com.smartwms.mapper.MaterialMapper;
+import com.smartwms.mapper.OutboundDetailMapper;
+import com.smartwms.mapper.OutboundHistoryMapper;
+import com.smartwms.mapper.OutboundOrderMapper;
 import com.smartwms.mapper.PermissionMapper;
 import com.smartwms.mapper.RoleMapper;
 import com.smartwms.mapper.RolePermissionMapper;
@@ -43,6 +49,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * 仅在开发环境自动插入种子数据；生产环境通过 SQL 脚本或手动初始化数据。
@@ -72,6 +79,9 @@ public class DataInitializer implements CommandLineRunner {
     private final AiReportMapper aiReportMapper;
     private final InboundOrderMapper inboundOrderMapper;
     private final InboundDetailMapper inboundDetailMapper;
+    private final OutboundOrderMapper outboundOrderMapper;
+    private final OutboundDetailMapper outboundDetailMapper;
+    private final OutboundHistoryMapper outboundHistoryMapper;
     private final BarcodeMapper barcodeMapper;
 
     public DataInitializer(UserMapper userMapper,
@@ -87,6 +97,9 @@ public class DataInitializer implements CommandLineRunner {
                            AiReportMapper aiReportMapper,
                            InboundOrderMapper inboundOrderMapper,
                            InboundDetailMapper inboundDetailMapper,
+                           OutboundOrderMapper outboundOrderMapper,
+                           OutboundDetailMapper outboundDetailMapper,
+                           OutboundHistoryMapper outboundHistoryMapper,
                            BarcodeMapper barcodeMapper) {
         this.userMapper = userMapper;
         this.roleMapper = roleMapper;
@@ -101,6 +114,9 @@ public class DataInitializer implements CommandLineRunner {
         this.aiReportMapper = aiReportMapper;
         this.inboundOrderMapper = inboundOrderMapper;
         this.inboundDetailMapper = inboundDetailMapper;
+        this.outboundOrderMapper = outboundOrderMapper;
+        this.outboundDetailMapper = outboundDetailMapper;
+        this.outboundHistoryMapper = outboundHistoryMapper;
         this.barcodeMapper = barcodeMapper;
     }
 
@@ -134,6 +150,9 @@ public class DataInitializer implements CommandLineRunner {
 
         // 7. 入库单（覆盖未入库 / 已完成）
         seedInboundOrders();
+
+        // 8. 出库单（覆盖已完成 / 部分出库 / 未出库）
+        seedOutboundOrders();
 
         log.info("========== [初始化] 种子数据装载完毕（"
                 + countMaterials() + " 种物料，"
@@ -622,6 +641,112 @@ public class DataInitializer implements CommandLineRunner {
             bc.setRemainingQty(detail.getPackCapacity()); // 整箱
             barcodeMapper.insert(bc);
         }
+    }
+
+    // ==================== 出库单种子数据（含关联看板） ====================
+
+    private void seedOutboundOrders() {
+        if (outboundOrderMapper.selectCount(null) > 0) return;
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // --- 已完成出库单 M_PART_001（200件=10箱），扣减对应入库条码 ---
+        OutboundOrder o1 = createOutboundOrder("CK" + now.minusDays(5).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS")),
+                "已完成", now.minusDays(5), "M_PART_001", 20, 200, 200, 10);
+
+        // --- 已完成出库单 M_PART_003（150件=3箱） ---
+        OutboundOrder o2 = createOutboundOrder("CK" + now.minusDays(3).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS")),
+                "已完成", now.minusDays(3), "M_PART_003", 50, 150, 150, 3);
+
+        // --- 已完成出库单 M_PART_006（60件=5箱） ---
+        OutboundOrder o3 = createOutboundOrder("CK" + now.minusDays(1).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS")),
+                "已完成", now.minusDays(1), "M_PART_006", 12, 60, 60, 5);
+
+        // --- 部分出库单 M_PART_010（30件=3箱，计划50件=5箱） ---
+        OutboundOrder o4 = createOutboundOrder("CK" + now.minusHours(12).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS")),
+                "部分出库", now.minusHours(12), "M_PART_010", 10, 50, 30, 3);
+
+        // --- 未出库单 M_PART_011（计划60件=2箱，拣货2箱但未确认） ---
+        OutboundOrder o5 = createOutboundOrder("CK" + now.minusHours(2).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS")),
+                "未出库", now.minusHours(2), "M_PART_011", 30, 60, 0, 2);
+
+        log.info("[初始化] 创建 5 条出库单（3 已完成 + 1 部分出库 + 1 未出库），含关联看板");
+    }
+
+    /**
+     * 创建一条出库单，关联真实入库条码。
+     * @param pickBoxes 拣货箱数（<= 该物料在库整箱数）
+     */
+    private OutboundOrder createOutboundOrder(String orderNo, String status, LocalDateTime createdAt,
+                                               String materialCode, int packCapacity, int planQty, int actualQty, int pickBoxes) {
+        OutboundOrder order = new OutboundOrder();
+        order.setOrderNo(orderNo);
+        order.setStatus(status);
+        order.setCreatedAt(createdAt);
+        outboundOrderMapper.insert(order);
+
+        OutboundDetail detail = new OutboundDetail();
+        detail.setOutboundId(order.getId());
+        detail.setOrderNo(orderNo);
+        detail.setMaterialCode(materialCode);
+        detail.setPackCapacity(packCapacity);
+        detail.setPlanQty(planQty);
+        detail.setActualQty(actualQty);
+        outboundDetailMapper.insert(detail);
+
+        // 查找该物料的在库条码，按 FIFO 选取 pickBoxes 个
+        List<Barcode> barcodes = barcodeMapper.selectList(
+                new LambdaQueryWrapper<Barcode>()
+                        .eq(Barcode::getType, "inbound")
+                        .eq(Barcode::getMaterialCode, materialCode)
+                        .eq(Barcode::getStatus, "在库")
+                        .orderByAsc(Barcode::getCreatedAt)
+        );
+
+        int picked = 0;
+        for (Barcode bc : barcodes) {
+            if (picked >= pickBoxes) break;
+            String newStatus = "已完成".equals(status) || "部分出库".equals(status) ? "已出库" : "待出库";
+            bc.setStatus(newStatus);
+            if ("已出库".equals(newStatus)) bc.setRemainingQty(0);
+            barcodeMapper.updateById(bc);
+
+            // 查找来源入库单信息
+            InboundOrder srcOrder = inboundOrderMapper.selectById(bc.getInboundId());
+            InboundDetail srcDetail = inboundDetailMapper.selectOne(
+                    new LambdaQueryWrapper<InboundDetail>()
+                            .eq(InboundDetail::getInboundId, bc.getInboundId())
+                            .eq(InboundDetail::getMaterialCode, materialCode)
+            );
+
+            OutboundHistory history = new OutboundHistory();
+            history.setOutboundId(order.getId());
+            history.setOutboundOrderNo(orderNo);
+            history.setOutboundDetailId(detail.getId());
+            history.setMaterialCode(materialCode);
+            history.setInboundId(bc.getInboundId() != null ? bc.getInboundId() : 0L);
+            history.setInboundOrderNo(srcOrder != null ? srcOrder.getOrderNo() : "—");
+            history.setInboundDetailId(srcDetail != null ? srcDetail.getId() : 0L);
+            history.setBarcodeId(bc.getId());
+            history.setBarcode(bc.getBarcode());
+            history.setDeductQty(packCapacity);
+            history.setCreatedAt(createdAt);
+            outboundHistoryMapper.insert(history);
+            picked++;
+        }
+
+        // 扣减库存（已完成/部分出库）
+        if (actualQty > 0) {
+            Inventory inv = inventoryMapper.selectOne(
+                    new LambdaQueryWrapper<Inventory>().eq(Inventory::getMaterialCode, materialCode)
+            );
+            if (inv != null) {
+                inv.setStockQty(Math.max(0, (inv.getStockQty() != null ? inv.getStockQty() : 0) - actualQty));
+                inventoryMapper.updateById(inv);
+            }
+        }
+
+        return order;
     }
 
     private long countMaterials() { return materialMapper.selectCount(null); }

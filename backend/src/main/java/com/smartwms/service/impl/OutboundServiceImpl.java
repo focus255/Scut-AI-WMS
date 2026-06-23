@@ -21,6 +21,7 @@ import com.smartwms.service.OutboundService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -109,9 +110,24 @@ public class OutboundServiceImpl implements OutboundService {
      */
     @Override
     public Page<OutboundOrder> page(int current, int size) {
+        return page(current, size, null, null, null, null);
+    }
+
+    @Override
+    public Page<OutboundOrder> page(int current, int size, String status, String orderNo,
+                                     LocalDate startDate, LocalDate endDate) {
         Page<OutboundOrder> page = new Page<>(current, size);
-        return outboundOrderMapper.selectPage(page,
-                new LambdaQueryWrapper<OutboundOrder>().orderByDesc(OutboundOrder::getCreatedAt));
+        LambdaQueryWrapper<OutboundOrder> wrapper = new LambdaQueryWrapper<>();
+        if (status != null && !status.isBlank())
+            wrapper.eq(OutboundOrder::getStatus, status.trim());
+        if (orderNo != null && !orderNo.isBlank())
+            wrapper.like(OutboundOrder::getOrderNo, orderNo.trim());
+        if (startDate != null)
+            wrapper.ge(OutboundOrder::getCreatedAt, startDate.atStartOfDay());
+        if (endDate != null)
+            wrapper.le(OutboundOrder::getCreatedAt, endDate.atTime(23, 59, 59));
+        wrapper.orderByDesc(OutboundOrder::getCreatedAt);
+        return outboundOrderMapper.selectPage(page, wrapper);
     }
 
     /**

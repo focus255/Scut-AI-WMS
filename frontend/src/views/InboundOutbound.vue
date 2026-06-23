@@ -9,15 +9,9 @@
       <el-tabs v-model="activeTab">
         <!-- === 入库管理 === -->
         <el-tab-pane label="入库管理" name="inbound">
-          <div class="inbound-summary">
-            <div>
-              <div class="summary-title">入库单流转</div>
-              <div class="summary-desc">创建入库单后确认到货，系统会生成条码并更新库存。</div>
-            </div>
-            <div class="summary-stats">
-              <span>待入库 {{ pendingCount }}</span>
-              <span>已完成 {{ completedCount }}</span>
-            </div>
+          <div class="history-stats">
+            <span>待入库 <b>{{ pendingCount }}</b></span>
+            <span>已完成 <b>{{ completedCount }}</b></span>
           </div>
 
           <div class="toolbar inbound-toolbar">
@@ -60,15 +54,9 @@
 
         <!-- === 出库管理 === -->
         <el-tab-pane label="出库管理" name="outbound">
-          <div class="inbound-summary">
-            <div>
-              <div class="summary-title">出库单流转</div>
-              <div class="summary-desc">创建出库单后扫码确认，系统按先进先出规则校验条码并扣减库存。</div>
-            </div>
-            <div class="summary-stats">
-              <span>待出库 {{ outPendingCount }}</span>
-              <span>已完成 {{ outCompletedCount }}</span>
-            </div>
+          <div class="history-stats">
+            <span>待出库 <b>{{ outPendingCount }}</b></span>
+            <span>已完成 <b>{{ outCompletedCount }}</b></span>
           </div>
 
           <div class="toolbar inbound-toolbar">
@@ -2142,42 +2130,20 @@ function onOutEditDialogOpened() {
 
 <style scoped>
 /* ==================== 布局 ==================== */
-.inbound-summary {
+.history-stats {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
+  gap: 24px;
+  padding: 10px 16px;
   margin-bottom: 14px;
   background: #f7f9fc;
   border: 1px solid var(--border-light);
   border-radius: 4px;
-}
-.summary-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-}
-.summary-desc {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-secondary);
-  line-height: 1.5;
 }
-.summary-stats {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  color: var(--text-regular);
-  font-size: 12px;
-}
-.summary-stats span {
-  padding: 4px 8px;
-  background: #fff;
-  border: 1px solid var(--border-light);
-  border-radius: 3px;
-  white-space: nowrap;
+.history-stats b {
+  color: var(--wms-primary);
+  margin-left: 4px;
 }
 .inbound-toolbar :deep(.el-button) {
   display: inline-flex;
@@ -2453,7 +2419,7 @@ function onOutEditDialogOpened() {
 
 /* ==================== 响应式 ==================== */
 @media (max-width: 760px) {
-  .inbound-summary,
+  .history-stats,
   .dialog-footer {
     align-items: flex-start;
     flex-direction: column;

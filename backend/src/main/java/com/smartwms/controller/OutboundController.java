@@ -13,6 +13,7 @@ import com.smartwms.entity.OutboundOrder;
 import com.smartwms.service.InboundService;
 import com.smartwms.service.OutboundService;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
 
 /**
  * 出库管理及统一扫码控制器。
@@ -44,8 +47,12 @@ public class OutboundController {
      */
     @GetMapping("/orders")
     public Result<Page<OutboundOrder>> page(@RequestParam(defaultValue = "1") int page,
-                                            @RequestParam(defaultValue = "10") int size) {
-        return Result.success(outboundService.page(page, size));
+                                            @RequestParam(defaultValue = "10") int size,
+                                            @RequestParam(required = false) String status,
+                                            @RequestParam(required = false) String orderNo,
+                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return Result.success(outboundService.page(page, size, status, orderNo, startDate, endDate));
     }
 
     /**

@@ -22,8 +22,8 @@
         <el-select v-model="filterStatus" placeholder="水位状态" clearable size="small"
           style="width: 140px" @change="loadReport">
           <el-option label="正常" value="NORMAL" />
-          <el-option label="超低储" value="LOW" />
-          <el-option label="超高储" value="HIGH" />
+          <el-option label="低储" value="LOW" />
+          <el-option label="高储" value="HIGH" />
         </el-select>
         <el-button size="small" @click="loadReport">刷新</el-button>
         <el-button size="small" @click="doExport">导出 CSV</el-button>
@@ -100,11 +100,11 @@ function rowClass({ row }) {
 }
 
 function badgeClass(v) {
-  const m = { 'LOW_STOCK': 'danger', 'DEAD_STOCK': 'warn', 'HIGH': 'warn', 'NORMAL': 'success' }
+  const m = { 'LOW_STOCK': 'danger', 'DEAD_STOCK': 'dead', 'HIGH': 'warning', 'NORMAL': 'success' }
   return m[v] || 'default'
 }
 function ruleLabel(v) {
-  const m = { 'LOW_STOCK': '超低储', 'DEAD_STOCK': '滞销', 'HIGH': '超高储', 'NORMAL': '正常' }
+  const m = { 'LOW_STOCK': '低储', 'DEAD_STOCK': '滞销', 'HIGH': '高储', 'NORMAL': '正常' }
   return m[v] || v
 }
 
@@ -122,7 +122,7 @@ const barOption = computed(() => {
         borderRadius: [4, 4, 0, 0],
         color: params => {
           const v = sorted[params.dataIndex]?.ruleEvaluation
-          return v === 'LOW_STOCK' ? '#f56c6c' : v === 'HIGH' ? '#e6a23c' : v === 'DEAD_STOCK' ? '#f0ad4e' : '#67c23a'
+          return v === 'LOW_STOCK' ? '#f56c6c' : v === 'HIGH' ? '#e6a23c' : v === 'DEAD_STOCK' ? '#606266' : '#67c23a'
         }
       }
     }]
@@ -140,9 +140,9 @@ const pieOption = computed(() => {
       label: { formatter: '{b}\n{d}%', fontSize: 11 },
       data: [
         { value: counts.NORMAL, name: '正常', itemStyle: { color: '#67c23a' } },
-        { value: counts.LOW_STOCK, name: '超低储', itemStyle: { color: '#f56c6c' } },
-        { value: counts.HIGH, name: '超高储', itemStyle: { color: '#e6a23c' } },
-        { value: counts.DEAD_STOCK, name: '滞销', itemStyle: { color: '#f0ad4e' } }
+        { value: counts.LOW_STOCK, name: '低储', itemStyle: { color: '#f56c6c' } },
+        { value: counts.HIGH, name: '高储', itemStyle: { color: '#e6a23c' } },
+        { value: counts.DEAD_STOCK, name: '滞销', itemStyle: { color: '#606266' } }
       ]
     }]
   }
@@ -169,8 +169,10 @@ function doExport() {
 .toolbar-tip { font-size: 12px; color: var(--text-secondary); margin-left: auto; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 500; }
 .badge-success { background: #f0f9eb; color: #67c23a; }
-.badge-warn    { background: #fdf6ec; color: #e6a23c; }
+.badge-success { background: #f0f9eb; color: #67c23a; }
+.badge-warning { background: #fdf6ec; color: #e6a23c; }
 .badge-danger  { background: #fef0f0; color: #f56c6c; }
+.badge-dead    { background: #f0f0f0; color: #606266; }
 .badge-default { background: #f4f4f5; color: #909399; }
 
 @media (max-width: 900px) {

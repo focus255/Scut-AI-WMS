@@ -8,6 +8,8 @@ import com.smartwms.dto.OutboundOrderVO;
 import com.smartwms.dto.ScanResponse;
 import com.smartwms.entity.OutboundOrder;
 
+import java.time.LocalDate;
+
 /**
  * 出库服务接口。
  */
@@ -16,6 +18,8 @@ public interface OutboundService {
     OutboundOrder create(OutboundOrderRequest request);
 
     Page<OutboundOrder> page(int current, int size);
+
+    Page<OutboundOrder> page(int current, int size, String status, String orderNo, LocalDate startDate, LocalDate endDate);
 
     OutboundOrderVO getById(Long id);
 
