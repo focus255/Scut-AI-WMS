@@ -5,48 +5,53 @@
 -->
 <template>
   <div class="admin-layout">
+    <div v-if="mobileMenuOpen" class="mobile-sidebar-mask" @click="mobileMenuOpen = false"></div>
+
     <!-- ===== 左侧菜单栏 ===== -->
-    <aside class="admin-sidebar" :class="{ collapsed: isCollapse }">
+    <aside class="admin-sidebar" :class="{ collapsed: isCollapse, 'mobile-open': mobileMenuOpen }">
       <div class="sidebar-logo">
         <div class="logo-icon">W</div>
         <transition name="fade">
           <span v-show="!isCollapse" class="logo-text">智库 WMS</span>
         </transition>
+        <button class="mobile-sidebar-close" type="button" aria-label="关闭菜单" @click="mobileMenuOpen = false">
+          <el-icon :size="18"><Close /></el-icon>
+        </button>
       </div>
 
       <nav class="sidebar-nav">
         <router-link to="/dashboard" class="nav-item"
-          :class="{ active: $route.path === '/dashboard' }">
+          :class="{ active: $route.path === '/dashboard' }" @click="mobileMenuOpen = false">
           <el-icon :size="18"><DataAnalysis /></el-icon>
           <span class="nav-label">智能看板</span>
         </router-link>
         <router-link to="/materials" class="nav-item"
-          :class="{ active: $route.path.startsWith('/materials') }">
+          :class="{ active: $route.path.startsWith('/materials') }" @click="mobileMenuOpen = false">
           <el-icon :size="18"><Document /></el-icon>
           <span class="nav-label">物料与基础数据</span>
         </router-link>
         <router-link to="/inbound-outbound" class="nav-item"
-          :class="{ active: $route.path.startsWith('/inbound-outbound') }">
+          :class="{ active: $route.path.startsWith('/inbound-outbound') }" @click="mobileMenuOpen = false">
           <el-icon :size="18"><Switch /></el-icon>
           <span class="nav-label">入库与出库管理</span>
         </router-link>
         <router-link to="/stock-report" class="nav-item"
-          :class="{ active: $route.path.startsWith('/stock-report') }">
+          :class="{ active: $route.path.startsWith('/stock-report') }" @click="mobileMenuOpen = false">
           <el-icon :size="18"><TrendCharts /></el-icon>
           <span class="nav-label">库存报表与预警</span>
         </router-link>
         <router-link to="/ai-report" class="nav-item"
-          :class="{ active: $route.path.startsWith('/ai-report') }">
+          :class="{ active: $route.path.startsWith('/ai-report') }" @click="mobileMenuOpen = false">
           <el-icon :size="18"><Cpu /></el-icon>
           <span class="nav-label">AI 智能报告</span>
         </router-link>
         <router-link to="/inventory-trace" class="nav-item"
-          :class="{ active: $route.path.startsWith('/inventory-trace') }">
+          :class="{ active: $route.path.startsWith('/inventory-trace') }" @click="mobileMenuOpen = false">
           <el-icon :size="18"><Search /></el-icon>
           <span class="nav-label">库存追溯</span>
         </router-link>
         <router-link to="/inbound-history" class="nav-item"
-          :class="{ active: $route.path.startsWith('/inbound-history') }">
+          :class="{ active: $route.path.startsWith('/inbound-history') }" @click="mobileMenuOpen = false">
           <el-icon :size="18"><Clock /></el-icon>
           <span class="nav-label">入库历史</span>
         </router-link>
@@ -63,6 +68,10 @@
     <div class="admin-main" :class="{ expanded: isCollapse }">
       <header class="admin-header">
         <div class="header-left">
+          <button class="mobile-menu-button" type="button" aria-label="打开菜单" @click="mobileMenuOpen = true">
+            <el-icon :size="20"><Menu /></el-icon>
+          </button>
+          <span class="mobile-page-title">{{ currentTitle }}</span>
           <el-breadcrumb separator="/">
             <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
             <el-breadcrumb-item v-if="currentTitle !== '首页'">{{ currentTitle }}</el-breadcrumb-item>
@@ -107,19 +116,24 @@
  * 后台管理经典两栏布局。
  * 退出确认使用模板式 Teleport-to-body 对话框，彻底规避命令式 API 的渲染时序问题。
  */
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { DataAnalysis, Document, Switch, TrendCharts, Cpu, Search, Clock, DArrowLeft, DArrowRight, UserFilled, WarningFilled } from '@element-plus/icons-vue'
+import { DataAnalysis, Document, Switch, TrendCharts, Cpu, Search, Clock, DArrowLeft, DArrowRight, UserFilled, WarningFilled, Menu, Close } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
 const isCollapse = ref(false)
+const mobileMenuOpen = ref(false)
 const showLogout = ref(false)
 
 const currentTitle = computed(() => route.meta.title || '首页')
+
+watch(() => route.fullPath, () => {
+  mobileMenuOpen.value = false
+})
 
 function doLogout() {
   showLogout.value = false
@@ -133,6 +147,7 @@ function doLogout() {
 .admin-layout {
   display: flex;
   height: 100vh;
+  min-width: 0;
 }
 
 /* ===== 侧边栏 ===== */
@@ -144,6 +159,7 @@ function doLogout() {
   transition: width 0.25s;
   flex-shrink: 0;
   overflow: hidden;
+  z-index: 30;
 }
 .admin-sidebar.collapsed {
   width: var(--sidebar-collapsed);
@@ -156,6 +172,7 @@ function doLogout() {
   justify-content: center;
   gap: 10px;
   border-bottom: 1px solid rgba(255,255,255,0.08);
+  position: relative;
 }
 .logo-icon {
   width: 34px; height: 34px;
@@ -210,6 +227,13 @@ function doLogout() {
 }
 .sidebar-footer:hover { color: #fff; }
 
+.mobile-sidebar-mask,
+.mobile-sidebar-close,
+.mobile-menu-button,
+.mobile-page-title {
+  display: none;
+}
+
 /* ===== 右侧主体 ===== */
 .admin-main {
   flex: 1;
@@ -228,7 +252,7 @@ function doLogout() {
   border-bottom: 1px solid var(--header-border);
   flex-shrink: 0;
 }
-.header-left { display: flex; align-items: center; }
+.header-left { display: flex; align-items: center; min-width: 0; }
 .header-right {
   display: flex;
   align-items: center;
@@ -250,4 +274,113 @@ function doLogout() {
 /* ===== 过渡动画 ===== */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+@media (max-width: 768px) {
+  .admin-layout {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .admin-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(82vw, 300px);
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.18);
+  }
+
+  .admin-sidebar.collapsed {
+    width: min(82vw, 300px);
+  }
+
+  .admin-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .mobile-sidebar-mask {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.42);
+    z-index: 20;
+  }
+
+  .mobile-sidebar-close {
+    display: inline-flex;
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    width: 34px;
+    height: 34px;
+    transform: translateY(-50%);
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 4px;
+    color: var(--sidebar-text);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .sidebar-footer {
+    display: none;
+  }
+
+  .admin-main {
+    width: 100%;
+  }
+
+  .admin-header {
+    height: 52px;
+    padding: 0 12px;
+    gap: 12px;
+  }
+
+  .mobile-menu-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    color: var(--text-regular);
+    background: #fff;
+    flex-shrink: 0;
+  }
+
+  .mobile-page-title {
+    display: block;
+    color: var(--text-primary);
+    font-size: 15px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-left :deep(.el-breadcrumb) {
+    display: none;
+  }
+
+  .header-right {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .header-user {
+    max-width: 96px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-divider {
+    display: none;
+  }
+
+  .admin-content {
+    -webkit-overflow-scrolling: touch;
+  }
+}
 </style>

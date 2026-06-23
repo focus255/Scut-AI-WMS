@@ -83,4 +83,19 @@ watch(() => props.option, () => {
 .chart-card-body {
   width: 100%;
 }
+
+@media (max-width: 768px) {
+  .chart-card {
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+
+  .chart-card-title {
+    margin-bottom: 10px;
+  }
+
+  .chart-card-body {
+    min-height: 240px;
+  }
+}
 </style>

@@ -228,4 +228,27 @@ function doExport() {
 .detail-info-item { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; background: #fafafa; border-radius: 4px; }
 .info-label { font-size: 12px; color: var(--text-secondary); }
 .info-value { font-size: 14px; color: var(--text-primary); font-weight: 500; }
+
+@media (max-width: 768px) {
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .stat-spacer {
+    display: none;
+  }
+
+  .stat-tip,
+  .toolbar-tip {
+    grid-column: 1 / -1;
+    margin-left: 0;
+  }
+
+  .detail-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

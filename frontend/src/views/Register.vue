@@ -197,4 +197,49 @@ async function handleRegister() {
   font-size: 12px;
   color: var(--text-placeholder);
 }
+
+@media (max-width: 768px) {
+  .register-wrapper {
+    height: 100dvh;
+    justify-content: flex-start;
+    padding: 18px 12px;
+    overflow-y: auto;
+  }
+
+  .register-box {
+    width: 100%;
+    max-width: 420px;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .register-brand {
+    width: 100%;
+    padding: 24px 20px;
+  }
+
+  .brand-icon {
+    width: 52px;
+    height: 52px;
+    font-size: 26px;
+    margin-bottom: 14px;
+  }
+
+  .brand-name {
+    font-size: 20px;
+  }
+
+  .register-form-area {
+    padding: 26px 22px 24px;
+  }
+
+  .form-title {
+    margin-bottom: 22px;
+  }
+
+  .register-copyright {
+    margin-top: 14px;
+    text-align: center;
+  }
+}
 </style>

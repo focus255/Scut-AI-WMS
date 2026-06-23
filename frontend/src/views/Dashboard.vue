@@ -411,5 +411,54 @@ function riskLabel(v) {
 .badge-danger  { background: #fef0f0; color: #f56c6c; }
 .badge-default { background: #f4f4f5; color: #909399; }
 
+/* 响应式布局 */
+@media (max-width: 900px) {
+  .chart-row,
+  .work-area {
+    flex-direction: column;
+  }
 
+  .chart-half,
+  .work-left,
+  .work-right {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .stat-spacer {
+    display: none;
+  }
+
+  .stat-tip {
+    grid-column: 1 / -1;
+    align-items: flex-start;
+  }
+
+  .scan-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .activity-item {
+    align-items: flex-start;
+  }
+
+  .act-time {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .stat-row {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

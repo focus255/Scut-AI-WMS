@@ -169,4 +169,49 @@ async function handleLogin() {
   font-size: 12px;
   color: var(--text-placeholder);
 }
+
+@media (max-width: 768px) {
+  .login-wrapper {
+    height: 100dvh;
+    justify-content: flex-start;
+    padding: 18px 12px;
+    overflow-y: auto;
+  }
+
+  .login-box {
+    width: 100%;
+    max-width: 420px;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .login-brand {
+    width: 100%;
+    padding: 28px 20px;
+  }
+
+  .brand-icon {
+    width: 52px;
+    height: 52px;
+    font-size: 26px;
+    margin-bottom: 14px;
+  }
+
+  .brand-name {
+    font-size: 20px;
+  }
+
+  .login-form-area {
+    padding: 28px 22px 24px;
+  }
+
+  .form-title {
+    margin-bottom: 22px;
+  }
+
+  .login-copyright {
+    margin-top: 14px;
+    text-align: center;
+  }
+}
 </style>

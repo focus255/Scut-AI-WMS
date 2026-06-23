@@ -210,4 +210,22 @@ function doExport() {
   color: var(--text-secondary);
   word-break: break-all;
 }
+
+@media (max-width: 768px) {
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .stat-spacer,
+  .toolbar-tip {
+    display: none;
+  }
+
+  .trace-barcode-cell :deep(canvas) {
+    max-width: 150px;
+  }
+}
 </style>

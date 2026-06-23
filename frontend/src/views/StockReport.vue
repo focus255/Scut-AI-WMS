@@ -176,4 +176,14 @@ function doExport() {
 @media (max-width: 900px) {
   .chart-row { flex-direction: column; }
 }
+
+@media (max-width: 768px) {
+  .toolbar {
+    align-items: stretch;
+  }
+
+  .toolbar-tip {
+    order: 10;
+  }
+}
 </style>

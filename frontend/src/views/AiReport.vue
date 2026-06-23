@@ -255,4 +255,26 @@ function levelBadge(l) {
 .badge-warn    { background: #fdf6ec; color: #e6a23c; }
 .badge-danger  { background: #fef0f0; color: #f56c6c; }
 .badge-default { background: #f4f4f5; color: #909399; }
+
+@media (max-width: 768px) {
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .diagnosis-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .analysis-box {
+    padding: 14px;
+  }
+}
+
+@media (max-width: 420px) {
+  .diagnosis-summary {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
