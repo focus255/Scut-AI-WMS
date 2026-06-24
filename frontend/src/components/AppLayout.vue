@@ -19,58 +19,54 @@
         </button>
       </div>
 
-      <nav class="sidebar-nav">
-        <router-link to="/dashboard" class="nav-item"
-          :class="{ active: $route.path === '/dashboard' }" @click="mobileMenuOpen = false">
+      <el-menu
+        :default-active="activeMenu"
+        :collapse="isCollapse"
+        router
+        background-color="transparent"
+        text-color="var(--sidebar-text)"
+        active-text-color="#fff"
+        class="sidebar-menu"
+      >
+        <!-- ====== 工作台 ====== -->
+        <el-menu-item index="/dashboard" @click="mobileMenuOpen = false">
           <el-icon :size="18"><DataAnalysis /></el-icon>
-          <span class="nav-label">仪表盘</span>
-        </router-link>
-        <router-link to="/materials" class="nav-item"
-          :class="{ active: $route.path.startsWith('/materials') }" @click="mobileMenuOpen = false">
-          <el-icon :size="18"><Document /></el-icon>
-          <span class="nav-label">物料与基础数据</span>
-        </router-link>
-        <router-link to="/inbound-outbound" class="nav-item"
-          :class="{ active: $route.path.startsWith('/inbound-outbound') }" @click="mobileMenuOpen = false">
-          <el-icon :size="18"><Switch /></el-icon>
-          <span class="nav-label">出入库管理</span>
-        </router-link>
-        <router-link to="/stock-report" class="nav-item"
-          :class="{ active: $route.path.startsWith('/stock-report') }" @click="mobileMenuOpen = false">
-          <el-icon :size="18"><TrendCharts /></el-icon>
-          <span class="nav-label">库存报表与预警</span>
-        </router-link>
-        <router-link to="/ai-report" class="nav-item"
-          :class="{ active: $route.path.startsWith('/ai-report') }" @click="mobileMenuOpen = false">
-          <el-icon :size="18"><Cpu /></el-icon>
-          <span class="nav-label">AI 智能报告</span>
-        </router-link>
-        <router-link to="/inventory-trace" class="nav-item"
-          :class="{ active: $route.path.startsWith('/inventory-trace') }" @click="mobileMenuOpen = false">
-          <el-icon :size="18"><Search /></el-icon>
-          <span class="nav-label">库存与看板监控</span>
-        </router-link>
-        <router-link to="/inbound-history" class="nav-item"
-          :class="{ active: $route.path.startsWith('/inbound-history') }" @click="mobileMenuOpen = false">
-          <el-icon :size="18"><Clock /></el-icon>
-          <span class="nav-label">出入库历史</span>
-        </router-link>
-        <router-link to="/scan" class="nav-item"
-          :class="{ active: $route.path.startsWith('/scan') }" @click="mobileMenuOpen = false">
-          <el-icon :size="18"><Camera /></el-icon>
-          <span class="nav-label">扫码操作</span>
-        </router-link>
-        <router-link to="/pda" class="nav-item"
-          :class="{ active: $route.path.startsWith('/pda') }" @click="mobileMenuOpen = false">
-          <el-icon :size="18"><Iphone /></el-icon>
-          <span class="nav-label">PDA</span>
-        </router-link>
-        <router-link to="/freeze" class="nav-item"
-          :class="{ active: $route.path.startsWith('/freeze') }" @click="mobileMenuOpen = false">
-          <el-icon :size="18"><Lock /></el-icon>
-          <span class="nav-label">封存管理</span>
-        </router-link>
-      </nav>
+          <span>仪表盘</span>
+        </el-menu-item>
+
+        <!-- ====== 基础数据 ====== -->
+        <el-sub-menu index="base">
+          <template #title>
+            <el-icon :size="18"><Document /></el-icon>
+            <span>基础数据</span>
+          </template>
+          <el-menu-item index="/materials" @click="mobileMenuOpen = false">物料与基础数据</el-menu-item>
+        </el-sub-menu>
+
+        <!-- ====== 作业管理 ====== -->
+        <el-sub-menu index="ops">
+          <template #title>
+            <el-icon :size="18"><Switch /></el-icon>
+            <span>作业管理</span>
+          </template>
+          <el-menu-item index="/inbound-outbound" @click="mobileMenuOpen = false">出入库管理</el-menu-item>
+          <el-menu-item index="/scan" @click="mobileMenuOpen = false">扫码操作</el-menu-item>
+          <el-menu-item index="/pda" @click="mobileMenuOpen = false">PDA 手持</el-menu-item>
+          <el-menu-item index="/freeze" @click="mobileMenuOpen = false">封存管理</el-menu-item>
+        </el-sub-menu>
+
+        <!-- ====== 数据中心 ====== -->
+        <el-sub-menu index="data">
+          <template #title>
+            <el-icon :size="18"><TrendCharts /></el-icon>
+            <span>数据中心</span>
+          </template>
+          <el-menu-item index="/stock-report" @click="mobileMenuOpen = false">库存报表与预警</el-menu-item>
+          <el-menu-item index="/inventory-trace" @click="mobileMenuOpen = false">库存与看板监控</el-menu-item>
+          <el-menu-item index="/ai-report" @click="mobileMenuOpen = false">AI 智能报告</el-menu-item>
+          <el-menu-item index="/inbound-history" @click="mobileMenuOpen = false">出入库历史</el-menu-item>
+        </el-sub-menu>
+      </el-menu>
 
       <div class="sidebar-footer" @click="isCollapse = !isCollapse">
         <el-icon :size="16">
@@ -134,7 +130,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { DataAnalysis, Document, Switch, TrendCharts, Cpu, Search, Camera, Clock, Lock, DArrowLeft, DArrowRight, UserFilled, WarningFilled, Menu, Close, Iphone } from '@element-plus/icons-vue'
+import { DataAnalysis, Document, Switch, TrendCharts, DArrowLeft, DArrowRight, UserFilled, WarningFilled, Menu, Close } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -145,6 +141,22 @@ const mobileMenuOpen = ref(false)
 const showLogout = ref(false)
 
 const currentTitle = computed(() => route.meta.title || '首页')
+
+// 根据当前路径计算 el-menu 的激活项
+const activeMenu = computed(() => {
+  const p = route.path
+  if (p.startsWith('/materials')) return '/materials'
+  if (p.startsWith('/inbound-outbound')) return '/inbound-outbound'
+  if (p.startsWith('/scan')) return '/scan'
+  if (p.startsWith('/pda')) return '/pda'
+  if (p.startsWith('/stock-report')) return '/stock-report'
+  if (p.startsWith('/inventory-trace')) return '/inventory-trace'
+  if (p.startsWith('/ai-report')) return '/ai-report'
+  if (p.startsWith('/inbound-history')) return '/inbound-history'
+  if (p.startsWith('/freeze')) return '/freeze'
+  if (p === '/dashboard' || p === '/') return '/dashboard'
+  return p
+})
 
 watch(() => route.fullPath, () => {
   mobileMenuOpen.value = false
@@ -207,28 +219,44 @@ function doLogout() {
   letter-spacing: 1px;
 }
 
-.sidebar-nav {
+.sidebar-menu {
   flex: 1;
-  padding: 12px 0;
   overflow-y: auto;
+  border-right: none !important;
+  padding: 8px 0;
 }
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.sidebar-menu :deep(.el-menu-item),
+.sidebar-menu :deep(.el-sub-menu__title) {
   height: 44px;
-  padding: 0 20px;
+  line-height: 44px;
   margin: 2px 8px;
   border-radius: 6px;
-  color: var(--sidebar-text);
-  text-decoration: none;
   font-size: 14px;
-  transition: all 0.15s;
-  white-space: nowrap;
 }
-.nav-item:hover { background: var(--sidebar-hover); color: #fff; }
-.nav-item.active { background: var(--wms-primary); color: #fff; }
-.nav-item .nav-label { overflow: hidden; text-overflow: ellipsis; }
+.sidebar-menu :deep(.el-menu-item:hover),
+.sidebar-menu :deep(.el-sub-menu__title:hover) {
+  background: var(--sidebar-hover) !important;
+}
+.sidebar-menu :deep(.el-menu-item.is-active) {
+  background: var(--wms-primary) !important;
+  color: #fff !important;
+}
+.sidebar-menu :deep(.el-sub-menu .el-menu) {
+  background: rgba(0,0,0,0.15);
+}
+.sidebar-menu :deep(.el-sub-menu .el-menu-item) {
+  padding-left: 56px !important;
+  height: 40px;
+  line-height: 40px;
+  font-size: 13px;
+}
+.sidebar-menu :deep(.el-sub-menu .el-menu-item.is-active) {
+  background: rgba(64,158,255,0.25) !important;
+}
+/* 折叠时子菜单不显示（el-menu 默认行为） */
+.sidebar-menu.collapsed :deep(.el-sub-menu.is-opened .el-menu) {
+  display: none;
+}
 
 .sidebar-footer {
   height: 40px;
