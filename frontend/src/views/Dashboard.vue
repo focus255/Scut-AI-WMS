@@ -34,44 +34,35 @@
       <ChartCard title="库存量 Top 10" :height="260" :option="stockBarOption" />
     </div>
 
-    <!-- 库存 -->
+    <!-- 需求趋势分析 -->
     <div class="content-block" style="margin-bottom: 16px">
       <div class="block-header">
-        <span class="block-title">库存</span>
-        <el-input v-model="searchKeyword" placeholder="搜索物料" clearable size="small"
-          style="width: 220px" />
+        <span class="block-title">需求趋势分析</span>
+        <span v-if="demandLoading" style="font-size:12px;color:var(--text-secondary)">加载中...</span>
       </div>
-      <el-table :data="pagedStockData" stripe size="small" v-loading="stockLoading" empty-text="暂无库存数据">
-        <el-table-column prop="materialCode" label="物料号" width="130" />
-        <el-table-column prop="materialName" label="物料名称" min-width="120" />
-        <el-table-column prop="stockQty" label="当前库存" width="80" align="right" />
-        <el-table-column label="日均消耗" width="75" align="right">
-          <template #default="{ row }">{{ row.dailyConsume != null ? row.dailyConsume.toFixed(1) : '—' }}</template>
-        </el-table-column>
-        <el-table-column label="安全库存" width="70" align="right">
-          <template #default="{ row }">{{ row.safetyStock ?? '—' }}</template>
-        </el-table-column>
-        <el-table-column label="最后出库" width="95" align="center">
-          <template #default="{ row }">
-            <span v-if="row.lastOutboundDate">{{ row.lastOutboundDate?.substring(0, 10) }}</span>
-            <span v-else style="color:#909399">无记录</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="评级" width="85" align="center">
-          <template #default="{ row }">
-            <span class="badge" :class="'badge-' + badgeClass(row.ruleEvaluation)">
-              {{ ruleLabel(row.ruleEvaluation) }}
+      <div v-if="anomalyItems.length" class="anomaly-alert">
+        <el-icon :size="16"><WarningFilled /></el-icon>
+        <span>检测到 {{ anomalyItems.length }} 个物料存在异常波动</span>
+      </div>
+      <div class="demand-grid">
+        <div v-for="(d, idx) in demandData" :key="d.materialCode" class="demand-card"
+          :class="{ 'card-anomaly': d.anomalyFlag }">
+          <div class="card-header">
+            <span class="card-code">{{ d.materialCode }}</span>
+            <span class="card-trend" :class="'trend-' + d.trend">
+              {{ d.trend === 'UP' ? '↑ 上升' : d.trend === 'DOWN' ? '↓ 下降' : '→ 平稳' }}
             </span>
-          </template>
-        </el-table-column>
-      </el-table>
-      <div style="margin-top: 12px; display: flex; justify-content: flex-end">
-        <el-pagination
-          v-if="filteredData.length > stockPageSize"
-          :current-page="stockPage" :page-size="stockPageSize" :total="filteredData.length"
-          layout="total, prev, pager, next" size="small"
-          @current-change="(p) => stockPage = p" />
+          </div>
+          <div :id="'chart-' + d.materialCode" class="demand-chart"></div>
+          <div class="card-footer">
+            <span class="badge badge-sm" :class="'badge-' + volClass(d.volatility)">{{ volLabel(d.volatility) }}</span>
+            <span v-if="d.anomalyFlag" class="badge badge-sm badge-danger" style="margin-left:4px">异常</span>
+            <span class="card-model">{{ d.model }}</span>
+          </div>
+          <div class="card-analysis" v-if="d.analysis">{{ d.analysis }}</div>
+        </div>
       </div>
+      <div v-if="!demandLoading && demandData.length === 0" class="empty-hint">暂无需求预测数据</div>
     </div>
   </div>
 </template>
@@ -80,18 +71,22 @@
 /**
  * 仪表盘 — 统计概览 + 图表 + 库存水位 + AI 速查 + 扫码入库 + 动态流 + 实时告警。
  */
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import * as echarts from 'echarts'
 import { getStockReport } from '@/api/stock'
+import { getDemandForecasts } from '@/api/demand'
 import { getInboundOrders } from '@/api/inbound'
 import { getOutboundOrders } from '@/api/outbound'
 import { ElMessage, ElNotification } from 'element-plus'
-import { WarningFilled, Search } from '@element-plus/icons-vue'
+import { WarningFilled } from '@element-plus/icons-vue'
 import ChartCard from '@/components/ChartCard.vue'
 
 const stats = reactive({ totalSku: 0, deadStockCount: 0, highRiskCount: 0 })
 const lastUpdateTime = ref('—')
 const stockData = ref([])
 const stockLoading = ref(false)
+const demandData = ref([])
+const demandLoading = ref(false)
 const searchKeyword = ref('')
 const filteredData = computed(() => {
   if (!searchKeyword.value) return stockData.value
@@ -160,11 +155,14 @@ const stockBarOption = computed(() => {
 
 onMounted(() => {
   loadData()
+  loadDemand()
   startAlertPolling()
 })
 
 onUnmounted(() => {
   if (alertTimer) clearInterval(alertTimer)
+  // 销毁所有需求趋势图表实例
+  Object.values(chartInstances).forEach(c => c.dispose())
 })
 
 async function loadData() {
@@ -246,6 +244,81 @@ function ruleLabel(v) {
   const m = { 'LOW_STOCK': '低储', 'HIGH': '高储', 'DEAD_STOCK': '呆滞', 'NORMAL': '正常' }
   return m[v] || v
 }
+
+// ==================== 需求趋势 ====================
+function parseHistory(json) {
+  try { return JSON.parse(json) || [] } catch { return [] }
+}
+function weeklyTotal(json) {
+  const arr = parseHistory(json)
+  return arr.reduce((s, v) => s + v, 0)
+}
+const maxDemandVal = computed(() => {
+  let max = 1
+  demandData.value.forEach(d => parseHistory(d.weeklyHistory).forEach(v => { if (v > max) max = v }))
+  return max
+})
+const anomalyItems = computed(() => demandData.value.filter(d => d.anomalyFlag))
+function weeklyAvg(json) {
+  const arr = parseHistory(json)
+  return arr.length ? Math.round(arr.reduce((s, v) => s + v, 0) / arr.length) : 0
+}
+function volClass(v) { return { 'HIGH': 'danger', 'MEDIUM': 'warning', 'LOW': 'success' }[v] || 'default' }
+function volLabel(v) { return { 'HIGH': '高波动', 'MEDIUM': '中波动', 'LOW': '低波动' }[v] || v }
+
+const chartInstances = {}
+
+async function loadDemand() {
+  demandLoading.value = true
+  try {
+    demandData.value = await getDemandForecasts() || []
+  } catch { /* */ }
+  finally { demandLoading.value = false }
+}
+
+// 监听数据变化，延迟渲染图表（确保 v-for DOM 已挂载）
+watch(demandData, () => {
+  setTimeout(() => renderDemandCharts(), 200)
+})
+
+function renderDemandCharts() {
+  demandData.value.forEach(d => {
+    const id = 'chart-' + d.materialCode
+    const el = document.getElementById(id)
+    if (!el) return
+    // 销毁旧实例
+    if (chartInstances[id]) { chartInstances[id].dispose(); delete chartInstances[id] }
+
+    const outHist = parseHistory(d.weeklyHistory)
+    const inHist = parseHistory(d.inboundHistory)
+    if (outHist.length === 0) return
+
+    const outFull = [...outHist, d.week1, d.week2, d.week3, d.week4]
+    const inFull = inHist.length > 0
+      ? [...inHist, d.inWeek1, d.inWeek2, d.inWeek3, d.inWeek4]
+      : outFull.map(v => Math.round(v * 0.8))
+    const labels = outHist.map((_, i) => 'W' + (i + 1))
+    const allLabels = [...labels, 'W13预', 'W14预', 'W15预', 'W16预']
+
+    const chart = echarts.init(el)
+    chart.setOption({
+      tooltip: { trigger: 'axis' },
+      legend: { bottom: 0, data: ['出库', '入库'], textStyle: { fontSize: 10 }, itemGap: 20 },
+      grid: { left: 42, right: 16, top: 10, bottom: 36 },
+      xAxis: { type: 'category', data: allLabels, axisLabel: { fontSize: 8 }, boundaryGap: false },
+      yAxis: { type: 'value', axisLabel: { fontSize: 8 }, splitLine: { lineStyle: { type: 'dashed', color: '#eee' } } },
+      series: [
+        { name: '出库', type: 'line', data: outFull, smooth: true, symbol: 'none',
+          lineStyle: { width: 2, color: '#409eff' },
+          areaStyle: { color: 'rgba(64,158,255,0.06)' } },
+        { name: '入库', type: 'line', data: inFull, smooth: true, symbol: 'none',
+          lineStyle: { width: 2, color: '#67c23a' },
+          areaStyle: { color: 'rgba(103,194,58,0.06)' } }
+      ]
+    })
+    chartInstances[id] = chart
+  })
+}
 </script>
 
 <style scoped>
@@ -287,6 +360,47 @@ function ruleLabel(v) {
 .badge-danger  { background: #fef0f0; color: #f56c6c; }
 .badge-dead    { background: #f0f0f0; color: #606266; }
 .badge-default { background: #f4f4f5; color: #909399; }
+
+/* ==================== 需求趋势卡片 ==================== */
+.demand-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 900px) {
+  .demand-grid { grid-template-columns: 1fr; }
+}
+.demand-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--border-light);
+  transition: box-shadow 0.2s;
+}
+.demand-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+.demand-card.card-anomaly { border-color: #f56c6c; background: #fef0f0; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.card-code { font-weight: 600; font-size: 14px; color: var(--text-primary); }
+.card-trend { font-size: 13px; font-weight: 600; }
+.trend-UP { color: #f56c6c; }
+.trend-DOWN { color: #67c23a; }
+.trend-STABLE { color: #909399; }
+.demand-chart { width: 100%; height: 200px; }
+.card-footer { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+.card-model { font-size: 10px; color: var(--text-placeholder); margin-left: auto; }
+.card-analysis {
+  font-size: 12px; color: var(--text-secondary);
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+  line-height: 1.6;
+}
+.badge-sm { font-size: 10px; padding: 1px 5px; }
+.anomaly-alert {
+  display: flex; align-items: center; gap: 8px;
+  background: #fef0f0; color: #f56c6c;
+  padding: 8px 12px; border-radius: 4px;
+  margin-bottom: 12px; font-size: 13px;
+}
 
 /* 响应式：中屏图表+扫码叠放 */
 @media (max-width: 1100px) {

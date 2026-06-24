@@ -207,6 +207,26 @@ CREATE TABLE IF NOT EXISTS `inventory_freezes` (
   `updated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- 18. 需求预测与波动监控表
+CREATE TABLE IF NOT EXISTS `demand_forecasts` (
+  `id`              BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+  `material_code`   VARCHAR(100) NOT NULL COMMENT '物料号',
+  `weekly_history`  TEXT COMMENT '近12周每周出库量 JSON 数组',
+  `week_1`          INT DEFAULT 0 COMMENT '第1周预测量（件）',
+  `week_2`          INT DEFAULT 0 COMMENT '第2周预测量（件）',
+  `week_3`          INT DEFAULT 0 COMMENT '第3周预测量（件）',
+  `week_4`          INT DEFAULT 0 COMMENT '第4周预测量（件）',
+  `trend`           VARCHAR(20) DEFAULT 'STABLE' COMMENT '趋势: UP / STABLE / DOWN',
+  `volatility`      VARCHAR(20) DEFAULT 'LOW' COMMENT '波动: LOW / MEDIUM / HIGH',
+  `anomaly_flag`    TINYINT(1) DEFAULT 0 COMMENT '是否有异常波动',
+  `analysis`        TEXT COMMENT 'LLM 生成的自然语言分析',
+  `model`           VARCHAR(100) DEFAULT '' COMMENT '使用的 AI 模型',
+  `generated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '生成时间',
+  `created_at`      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_material` (`material_code`)
+);
+
 -- ===================================================================
 -- 种子数据请使用 seed_data.sql 通过 MySQL 客户端导入:
 --   mysql -u root -p smart_wms_dev < seed_data.sql
