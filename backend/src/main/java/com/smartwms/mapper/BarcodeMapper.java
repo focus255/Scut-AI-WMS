@@ -1,5 +1,5 @@
 /**
- * 条码表 Mapper 接口。
+ * 二维码表 Mapper 接口。
  *
  * @author Focus
  * @date 2026-06-03

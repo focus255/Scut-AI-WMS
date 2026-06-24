@@ -61,7 +61,7 @@ public class OutboundServiceImpl implements OutboundService {
     }
 
     /**
-     * 根据物料编码查询器具包装容量（使用物料默认供应商）。
+     * 根据物料号查询器具包装容量（使用物料默认供应商）。
      * 若未找到器具配置则抛出业务异常。
      */
     private int getOutPackCapacity(String materialCode) {
@@ -88,7 +88,7 @@ public class OutboundServiceImpl implements OutboundService {
     }
 
     /**
-     * 创建出库单，按整箱 FIFO 选取入库条码，不做拆零重封装。
+     * 创建出库单，按整箱 FIFO 选取入库二维码，不做拆零重封装。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -142,7 +142,7 @@ public class OutboundServiceImpl implements OutboundService {
         List<OutboundDetail> details = outboundDetailMapper.selectList(
                 new LambdaQueryWrapper<OutboundDetail>().eq(OutboundDetail::getOutboundId, id)
         );
-        // 一码到底：通过出库流水表关联的入库条码
+        // 一码到底：通过出库流水表关联的入库二维码
         List<OutboundHistory> outHistories = outboundHistoryMapper.selectList(
                 new LambdaQueryWrapper<OutboundHistory>()
                         .eq(OutboundHistory::getOutboundId, id)
@@ -163,7 +163,7 @@ public class OutboundServiceImpl implements OutboundService {
     }
 
     /**
-     * 确认出库并同步推进条码生命周期。
+     * 确认出库并同步推进二维码生命周期。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -210,7 +210,7 @@ public class OutboundServiceImpl implements OutboundService {
                     .sum();
             if (!item.getActualQty().equals(confirmedQty)) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST,
-                        "出库明细 " + detail.getId() + " 的实际数量与条码折算数量不一致");
+                        "出库明细 " + detail.getId() + " 的实际数量与二维码折算数量不一致");
             }
 
             int currentActualQty = detail.getActualQty() != null ? detail.getActualQty() : 0;
@@ -277,10 +277,10 @@ public class OutboundServiceImpl implements OutboundService {
         for (String barcode : barcodes) {
             String value = barcode != null ? barcode.trim() : null;
             if (value == null || value.isEmpty()) {
-                throw new BusinessException(ErrorCode.BAD_REQUEST, "出库条码不能为空");
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "出库二维码不能为空");
             }
             if (!localBarcodeSet.add(value) || !globalBarcodeSet.add(value)) {
-                throw new BusinessException(ErrorCode.BAD_REQUEST, "出库确认请求中存在重复条码：" + value);
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "出库确认请求中存在重复二维码：" + value);
             }
             normalized.add(value);
         }
@@ -292,7 +292,7 @@ public class OutboundServiceImpl implements OutboundService {
                 new LambdaQueryWrapper<Barcode>().in(Barcode::getBarcode, normalizedBarcodes)
         );
         if (barcodes.size() != normalizedBarcodes.size()) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "存在未找到的出库条码");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "存在未找到的出库二维码");
         }
         Map<String, Barcode> barcodeMap = barcodes.stream()
                 .collect(Collectors.toMap(Barcode::getBarcode, barcode -> barcode, (a, b) -> a, LinkedHashMap::new));
@@ -303,15 +303,15 @@ public class OutboundServiceImpl implements OutboundService {
         for (Barcode barcode : selectedBarcodes) {
             if (!detail.getMaterialCode().equals(barcode.getMaterialCode())) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST,
-                        "条码 " + barcode.getBarcode() + " 与出库明细物料不匹配");
+                        "二维码 " + barcode.getBarcode() + " 与出库明细物料不匹配");
             }
             if (!"inbound".equals(barcode.getType())) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST,
-                        "条码 " + barcode.getBarcode() + " 不是入库条码，不可用于出库");
+                        "二维码 " + barcode.getBarcode() + " 不是入库二维码，不可用于出库");
             }
             if (!"待出库".equals(barcode.getStatus())) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST,
-                        "条码 " + barcode.getBarcode() + " 当前状态为 " + barcode.getStatus() + "，仅「待出库」状态可确认出库");
+                        "二维码 " + barcode.getBarcode() + " 当前状态为 " + barcode.getStatus() + "，仅「待出库」状态可确认出库");
             }
         }
     }
@@ -337,9 +337,9 @@ public class OutboundServiceImpl implements OutboundService {
         if ("已完成".equals(order.getStatus()))
             throw new BusinessException(ErrorCode.BAD_REQUEST, "已完成的出库单不可修改");
 
-        // 退回库存：将已拣的入库条码恢复为在库
+        // 退回库存：将已拣的入库二维码恢复为在库
         rollbackPick(order.getId());
-        // 删除旧明细和流水（一码到底：不删条码，条码由 rollbackPick 恢复）
+        // 删除旧明细和流水（一码到底：不删二维码，二维码由 rollbackPick 恢复）
         outboundDetailMapper.delete(new LambdaQueryWrapper<OutboundDetail>()
                 .eq(OutboundDetail::getOutboundId, id));
         outboundHistoryMapper.delete(new LambdaQueryWrapper<OutboundHistory>()
@@ -375,7 +375,7 @@ public class OutboundServiceImpl implements OutboundService {
     }
 
     /**
-     * 退回已拣库存：通过出库流水找到被拣选的入库条码，恢复为「在库」。
+     * 退回已拣库存：通过出库流水找到被拣选的入库二维码，恢复为「在库」。
      */
     private void rollbackPick(Long outboundId) {
         List<OutboundHistory> histories = outboundHistoryMapper.selectList(
@@ -414,7 +414,7 @@ public class OutboundServiceImpl implements OutboundService {
      * 流程：
      * 1. 查 Appliance 获取出库单箱容量
      * 2. planQty = boxCount × packCapacity
-     * 3. 按 FIFO 查找该物料所有在库整箱条码
+     * 3. 按 FIFO 查找该物料所有在库整箱二维码
      * 4. 选取最早 boxCount 个整箱，标记为已出库
      * 5. 生成出库标签（每箱一个）
      * 6. 扣减库存
@@ -444,8 +444,8 @@ public class OutboundServiceImpl implements OutboundService {
                     "库存不足：物料 " + materialCode + " 需要 " + planQty + " 件（" + boxCount + " 箱 × " + outPackCapacity + "），当前仅剩 " + stockQty + " 件");
         }
 
-        // 按 FIFO 查找该物料所有在库的入库条码，只选取整箱（remainingQty = 原始 packCapacity）
-        // 跳过封存（FROZEN）状态的条码
+        // 按 FIFO 查找该物料所有在库的入库二维码，只选取整箱（remainingQty = 原始 packCapacity）
+        // 跳过封存（FROZEN）状态的二维码
         List<Barcode> inboundBarcodes = barcodeMapper.selectList(
                 new LambdaQueryWrapper<Barcode>()
                         .eq(Barcode::getType, "inbound")
@@ -454,7 +454,7 @@ public class OutboundServiceImpl implements OutboundService {
                         .gt(Barcode::getRemainingQty, 0)
         );
 
-        // 过滤整箱条码
+        // 过滤整箱二维码
         List<Barcode> fullBoxBarcodes = new ArrayList<>();
         for (Barcode bc : inboundBarcodes) {
             int expectedFull = getInboundPackCapacity(bc);
@@ -485,11 +485,11 @@ public class OutboundServiceImpl implements OutboundService {
         for (int i = 0; i < selectedBoxes.size(); i++) {
             Barcode ib = selectedBoxes.get(i);
             ib.setStatus("待出库");
-            // 暂存出库单ID到条码（复用 inboundId 字段在 type=inbound 时仍保留原入库单ID，此处用 supplierCode 存出库单标识）
+            // 暂存出库单ID到二维码（复用 inboundId 字段在 type=inbound 时仍保留原入库单ID，此处用 supplierCode 存出库单标识）
             // 实际通过 OutboundHistory 表关联即可
             barcodeMapper.updateById(ib);
 
-            // 记录出库流水，关联源入库条码
+            // 记录出库流水，关联源入库二维码
             InboundDetail sourceDetail = inboundDetailMapper.selectOne(
                     new LambdaQueryWrapper<InboundDetail>()
                             .eq(InboundDetail::getInboundId, ib.getInboundId())
@@ -504,7 +504,7 @@ public class OutboundServiceImpl implements OutboundService {
             history.setInboundId(ib.getInboundId());
             history.setInboundOrderNo(sourceOrder != null ? sourceOrder.getOrderNo() : "—");
             history.setInboundDetailId(sourceDetail != null ? sourceDetail.getId() : 0L);
-            history.setBarcodeId(ib.getId()); // 源入库条码 ID
+            history.setBarcodeId(ib.getId()); // 源入库二维码 ID
             history.setBarcode(ib.getBarcode());
             history.setDeductQty(outPackCapacity);
             outboundHistoryMapper.insert(history);
@@ -532,27 +532,27 @@ public class OutboundServiceImpl implements OutboundService {
     }
 
     /**
-     * 扫码出库（一码到底）：直接扫描入库条码（WMS|...）核销出库。
-     * 仅接受状态为「待出库」的入库条码。
+     * 扫码出库（一码到底）：直接扫描入库二维码（WMS|...）核销出库。
+     * 仅接受状态为「待出库」的入库二维码。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ScanResponse scanOutbound(String barcodeStr) {
         if (barcodeStr == null || !barcodeStr.startsWith("WMS|")) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "出库请扫描入库条码（WMS|... 格式），OUT标签已废弃");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "出库请扫描入库二维码（WMS|... 格式），OUT标签已废弃");
         }
 
-        // 查找入库条码
+        // 查找入库二维码
         Barcode inboundBc = barcodeMapper.selectOne(
                 new LambdaQueryWrapper<Barcode>()
                         .eq(Barcode::getBarcode, barcodeStr)
                         .eq(Barcode::getType, "inbound")
         );
         if (inboundBc == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "条码不存在：" + barcodeStr);
+            throw new BusinessException(ErrorCode.NOT_FOUND, "二维码不存在：" + barcodeStr);
         }
         if ("已出库".equals(inboundBc.getStatus())) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "该条码已出库，请勿重复扫码");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "该二维码已出库，请勿重复扫码");
         }
         if (!"待出库".equals(inboundBc.getStatus())) {
             if ("在库".equals(inboundBc.getStatus())) {
@@ -560,7 +560,7 @@ public class OutboundServiceImpl implements OutboundService {
                         "未创建出库单，禁止出库。请先在PC端出入库管理新建出库单");
             }
             throw new BusinessException(ErrorCode.BAD_REQUEST,
-                    "条码当前状态为「" + inboundBc.getStatus() + "」，不可出库");
+                    "二维码当前状态为「" + inboundBc.getStatus() + "」，不可出库");
         }
 
         String materialCode = inboundBc.getMaterialCode();
@@ -580,7 +580,7 @@ public class OutboundServiceImpl implements OutboundService {
         );
         Long outboundId = history != null ? history.getOutboundId() : null;
         if (outboundId == null) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "该条码未关联出库单，无法扫码出库");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "该二维码未关联出库单，无法扫码出库");
         }
 
         OutboundOrder order = outboundOrderMapper.selectById(outboundId);

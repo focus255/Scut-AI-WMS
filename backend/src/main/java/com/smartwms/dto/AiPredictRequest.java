@@ -10,7 +10,7 @@ import jakarta.validation.constraints.NotBlank;
 
 public class AiPredictRequest {
 
-    @NotBlank(message = "物料编码不能为空")
+    @NotBlank(message = "物料号不能为空")
     private String materialCode;
 
     public String getMaterialCode() { return materialCode; }

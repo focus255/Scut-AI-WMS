@@ -68,7 +68,7 @@ const info = computed(() => {
 /** 显示用的器具类型（优先 prop，其次 API 查找） */
 const displayPackType = computed(() => props.packType || resolvedPackType.value || '—')
 
-/** 从条码解析的物料号+供应商查找器具类型 */
+/** 从二维码解析的物料号+供应商查找器具类型 */
 async function resolvePackType() {
   if (props.packType) { resolvedPackType.value = props.packType; return }
   const mat = info.value.materialCode

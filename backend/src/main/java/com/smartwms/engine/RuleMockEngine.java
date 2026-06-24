@@ -24,7 +24,7 @@ public class RuleMockEngine {
     /**
      * 根据本地规则生成降级 Mock 报告，覆盖四级评级。
      *
-     * @param materialCode 物料编码
+     * @param materialCode 物料号
      * @param inventory    当前库存快照
      * @param dailyConsume 近 30 日日均消耗量
      * @param futureDemand 未来 15 天预测总需求

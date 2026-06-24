@@ -11,7 +11,7 @@ public class ScanResponse {
     /** 扫码类型：inbound（入库）/ outbound（出库） */
     private String type;
 
-    /** 物料编码 */
+    /** 物料号 */
     private String materialCode;
 
     /** 供应商编码（入库时有值，出库时为 "OUT"） */
@@ -23,7 +23,7 @@ public class ScanResponse {
     /** 本次操作数量 */
     private Integer qty;
 
-    /** 条码号 */
+    /** 看板号 */
     private String barcode;
 
     // ==================== 静态工厂 ====================

@@ -24,7 +24,7 @@ public class FreezeController {
         this.freezeService = freezeService;
     }
 
-    /** 封存条码 */
+    /** 封存二维码 */
     @PostMapping("/seal")
     public Result<Void> seal(@Valid @RequestBody FreezeRequest request,
                               @RequestHeader(value = "X-Operator", defaultValue = "admin") String operator) {
@@ -32,7 +32,7 @@ public class FreezeController {
         return Result.success("封存成功", null);
     }
 
-    /** 解封条码 */
+    /** 解封二维码 */
     @PostMapping("/unseal")
     public Result<Void> unseal(@RequestParam String barcode,
                                 @RequestHeader(value = "X-Operator", defaultValue = "admin") String operator) {

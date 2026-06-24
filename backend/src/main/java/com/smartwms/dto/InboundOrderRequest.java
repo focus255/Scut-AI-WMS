@@ -15,7 +15,7 @@ import java.util.List;
 
 public class InboundOrderRequest {
 
-    @NotBlank(message = "供应商代码不能为空")
+    @NotBlank(message = "供应商编码不能为空")
     private String supplierCode;
 
     @NotEmpty(message = "入库明细不能为空")

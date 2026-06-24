@@ -1,5 +1,5 @@
 <!--
-  库存追溯查询页 — 按物料/条码/入库单号查询条码生命周期轨迹。
+  库存与看板监控页 — 按物料/二维码/入库单号查询二维码生命周期轨迹。
   @author Focus
   @date 2026-06-10
 -->
@@ -7,13 +7,13 @@
   <div class="page-container">
     <div class="content-block">
       <div class="block-header">
-        <span class="block-title">库存追溯查询</span>
-        <span class="toolbar-tip">按物料编码、条码号或入库单号查询条码生命周期轨迹</span>
+        <span class="block-title">库存与看板监控</span>
+        <span class="toolbar-tip">按物料号、看板号或入库单号查询二维码生命周期轨迹</span>
       </div>
       <div class="toolbar">
-        <el-input v-model="query.materialCode" placeholder="物料编码" clearable size="small"
+        <el-input v-model="query.materialCode" placeholder="物料号" clearable size="small"
           style="width: 160px" @keyup.enter="doQuery" />
-        <el-input v-model="query.barcode" placeholder="条码号（模糊）" clearable size="small"
+        <el-input v-model="query.barcode" placeholder="看板号（模糊）" clearable size="small"
           style="width: 200px" @keyup.enter="doQuery" />
         <el-input v-model="query.orderNo" placeholder="入库单号（模糊）" clearable size="small"
           style="width: 200px" @keyup.enter="doQuery" />
@@ -39,7 +39,7 @@
         empty-text="暂无追溯数据，请尝试修改查询条件"
         @selection-change="(rows) => selectedRows = rows">
         <el-table-column type="selection" width="40" />
-        <el-table-column label="条码号" min-width="280">
+        <el-table-column label="看板号" min-width="280">
           <template #default="{ row }">
             <div class="trace-barcode-cell">
               <QRCode :value="row.barcode" :height="32" :display-value="false" />
@@ -83,7 +83,7 @@
 
 <script setup>
 /**
- * 库存追溯查询 — 联查条码与入库明细，展示完整生命周期。
+ * 库存与看板监控 — 联查二维码与入库明细，展示完整生命周期。
  */
 import { ref, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -143,13 +143,13 @@ function statusBadgeClass(status) {
 }
 
 /**
- * 批量打印选中的条码标签。
+ * 批量打印选中的二维码标签。
  */
 function batchPrint() {
-  if (!selectedRows.value.length) { ElMessage.warning('请先选择条码'); return }
+  if (!selectedRows.value.length) { ElMessage.warning('请先选择二维码'); return }
   const barcodes = selectedRows.value.map(r => r.barcode).join('\n')
   const win = window.open('', '_blank', 'width=800,height=600')
-  win.document.write('<html><head><title>批量条码打印</title><\/head><body>' +
+  win.document.write('<html><head><title>批量二维码打印</title><\/head><body>' +
     '<pre style="font-family: monospace; font-size: 12px; line-height: 1.8">' + barcodes + '<\/pre>' +
     '<script>window.onload=function(){window.print()}<\/script><\/body><\/html>')
   win.document.close()
@@ -158,14 +158,14 @@ function batchPrint() {
 function doExport() {
   if (!traceData.value.length) { ElMessage.warning('没有数据可导出'); return }
   exportCSV([
-    { key: 'barcode', label: '条码号' },
+    { key: 'barcode', label: '看板号' },
     { key: 'materialCode', label: '物料号' },
     { key: 'supplierCode', label: '供应商' },
     { key: 'orderNo', label: '入库单号' },
     { key: 'status', label: '状态' },
     { key: 'actualQty', label: '实收数' },
     { key: 'barcodeUpdatedAt', label: '最后更新' }
-  ], traceData.value, `库存追溯_${new Date().toISOString().substring(0, 10)}`)
+  ], traceData.value, `库存与看板监控_${new Date().toISOString().substring(0, 10)}`)
   ElMessage.success('导出成功')
 }
 </script>

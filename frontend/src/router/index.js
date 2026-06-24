@@ -28,7 +28,7 @@ const routes = [
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('@/views/Dashboard.vue'),
-        meta: { title: '智能库存看板' }
+        meta: { title: '仪表盘' }
       },
       {
         path: 'materials',
@@ -58,7 +58,7 @@ const routes = [
         path: 'inventory-trace',
         name: 'InventoryTrace',
         component: () => import('@/views/InventoryTrace.vue'),
-        meta: { title: '库存追溯' }
+        meta: { title: '库存与看板监控' }
       },
       {
         path: 'inbound-history',
@@ -102,7 +102,7 @@ const routes = [
     ]
   },
   {
-    // 未匹配路由重定向到看板
+    // 未匹配路由重定向到仪表盘
     path: '/:pathMatch(.*)*',
     redirect: '/dashboard'
   }
@@ -122,7 +122,7 @@ router.beforeEach((to, _from, next) => {
   if (!to.meta.noAuth && !token) {
     next('/login')
   } else if ((to.path === '/login' || to.path === '/register') && token) {
-    // 已登录用户访问登录/注册页直接跳看板
+    // 已登录用户访问登录/注册页直接跳仪表盘
     next('/dashboard')
   } else {
     next()

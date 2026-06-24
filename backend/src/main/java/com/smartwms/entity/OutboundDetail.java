@@ -21,7 +21,7 @@ public class OutboundDetail {
     /** 主单号 */
     private String orderNo;
 
-    /** 零件号 */
+    /** 物料号 */
     private String materialCode;
 
     /** 出库单器具容量快照 */

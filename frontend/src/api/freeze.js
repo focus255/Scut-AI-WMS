@@ -6,12 +6,12 @@
  */
 import request from './request'
 
-/** 封存条码 */
+/** 封存二维码 */
 export function sealBarcodes(data) {
   return request.post('/freeze/seal', data)
 }
 
-/** 解封条码 */
+/** 解封二维码 */
 export function unsealBarcode(barcode) {
   return request.post('/freeze/unseal', null, { params: { barcode } })
 }

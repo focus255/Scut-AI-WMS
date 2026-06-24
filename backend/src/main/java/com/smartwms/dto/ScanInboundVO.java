@@ -20,7 +20,7 @@ public class ScanInboundVO {
     private Boolean confirmed;
 
     /**
-     * 从条码和明细组装扫码入库结果。
+     * 从二维码和明细组装扫码入库结果。
      */
     public static ScanInboundVO from(Barcode bc, InboundDetail detail, boolean confirmed) {
         ScanInboundVO vo = new ScanInboundVO();

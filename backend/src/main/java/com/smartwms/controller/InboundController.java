@@ -98,7 +98,7 @@ public class InboundController {
     }
 
     /**
-     * 扫码入库：按条码号精确核销单箱入库。
+     * 扫码入库：按看板号精确核销单箱入库。
      * POST /api/inbound/scan
      */
     @PostMapping("/scan")
@@ -107,7 +107,7 @@ public class InboundController {
     }
 
     /**
-     * 库存追溯：按物料/条码/入库单号查询条码生命周期轨迹。
+     * 库存追溯：按物料/二维码/入库单号查询二维码生命周期轨迹。
      * GET /api/inbound/trace?materialCode=&barcode=&orderNo=
      */
     @GetMapping("/trace")

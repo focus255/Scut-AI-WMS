@@ -126,13 +126,13 @@ INSERT IGNORE INTO inventories (material_code, stock_qty, min_stock_days, max_st
 ('M_PART_011', 240, 3, 20, 35, 5);   -- 闲置95天
 
 
--- ==================== 6. 入库→条码→出库 完整业务链路 ====================
--- 存储过程严格按照真实流程：入库单→生成条码→FIFO拣选出库→出库流水追溯
+-- ==================== 6. 入库→二维码→出库 完整业务链路 ====================
+-- 存储过程严格按照真实流程：入库单→生成二维码→FIFO拣选出库→出库流水追溯
 -- 所有数据完全合规，无"种子数据"、无 ID=0 的非法引用
 
 DELIMITER //
 
--- 辅助子过程：为一批入库生成条码（使用全局临时表跟踪箱序号）
+-- 辅助子过程：为一批入库生成二维码（使用全局临时表跟踪箱序号）
 CREATE PROCEDURE IF NOT EXISTS gen_barcodes(
     IN p_mat VARCHAR(20), IN p_sup VARCHAR(20), IN p_cap INT,
     IN p_qty INT, IN p_inb_id BIGINT, IN p_date INT)
@@ -210,7 +210,7 @@ BEGIN
 
     -- 幂等检查（用 early return 代替 LEAVE）
     IF (SELECT COUNT(*) FROM outbound_histories) > 50 THEN
-        SELECT '入库/出库/条码数据已存在，跳过生成' AS result;
+        SELECT '入库/出库/二维码数据已存在，跳过生成' AS result;
         CLOSE mat_cursor;
         -- 直接跳到末尾无法实现，改用条件判断包裹后续逻辑
     ELSE
@@ -221,7 +221,7 @@ BEGIN
         DELETE FROM barcodes WHERE inbound_id = 0 OR type NOT IN ('inbound','outbound');
     END IF;
 
-    -- 全局条码序号临时表
+    -- 全局二维码序号临时表
     DROP TEMPORARY TABLE IF EXISTS temp_box_seq;
     CREATE TEMPORARY TABLE temp_box_seq (seq INT);
     INSERT INTO temp_box_seq VALUES (0);
@@ -273,7 +273,7 @@ BEGIN
         SET v_boxes_2 = CEIL(v_total_boxes * 0.35);
         SET v_boxes_3 = v_total_boxes - v_boxes_1 - v_boxes_2;
 
-        -- ====== 第3步：分3批创建入库单+条码 ======
+        -- ====== 第3步：分3批创建入库单+二维码 ======
         SET v_box_seq = 0;
 
         -- 第1批（最早，v_span+60天前）
@@ -339,10 +339,10 @@ BEGIN
             VALUES (v_out_order_id, v_out_order_no, v_mat_code, v_pack_cap, v_qty, v_qty);
             SELECT id INTO v_out_detail_id FROM outbound_details WHERE order_no = v_out_order_no LIMIT 1;
 
-            -- FIFO拣选：从最老的可用条码中扣减
+            -- FIFO拣选：从最老的可用二维码中扣减
             SET v_pick_qty = v_qty;
             WHILE v_pick_qty > 0 DO
-                -- 找最老的在库条码
+                -- 找最老的在库二维码
                 SELECT id, barcode, inbound_id, remaining_qty
                 INTO v_bc_id, v_bc_barcode, v_bc_inbound_id, v_bc_remaining
                 FROM barcodes
@@ -361,14 +361,14 @@ BEGIN
                     SET v_pick_remaining = 0;
                 END IF;
 
-                -- 更新条码状态
+                -- 更新二维码状态
                 IF v_pick_remaining <= 0 THEN
                     UPDATE barcodes SET remaining_qty = 0, status = '已出库' WHERE id = v_bc_id;
                 ELSE
                     UPDATE barcodes SET remaining_qty = v_pick_remaining WHERE id = v_bc_id;
                 END IF;
 
-                -- 查出该条码对应的入库单信息
+                -- 查出该二维码对应的入库单信息
                 SELECT order_no INTO v_inb_order_no FROM inbound_orders WHERE id = v_bc_inbound_id;
                 SELECT id INTO v_inb_detail_id FROM inbound_details WHERE inbound_id = v_bc_inbound_id AND material_code = v_mat_code LIMIT 1;
 
@@ -390,13 +390,13 @@ BEGIN
     END LOOP mat_loop;
     CLOSE mat_cursor;
 
-    -- ====== 第5步：同步库存现存量（从条码汇总） ======
+    -- ====== 第5步：同步库存现存量（从二维码汇总） ======
     UPDATE inventories i
     SET i.stock_qty = COALESCE(
         (SELECT SUM(b.remaining_qty) FROM barcodes b
          WHERE b.material_code = i.material_code AND b.status = '在库'), 0);
 
-    SELECT CONCAT('入库/出库/条码 完整链路生成完成，出库流水=', (SELECT COUNT(*) FROM outbound_histories), ' 条') AS result;
+    SELECT CONCAT('入库/出库/二维码 完整链路生成完成，出库流水=', (SELECT COUNT(*) FROM outbound_histories), ' 条') AS result;
 
     DROP TEMPORARY TABLE IF EXISTS temp_box_seq;
 END//

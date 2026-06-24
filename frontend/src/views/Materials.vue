@@ -13,7 +13,7 @@
             <el-button type="primary" size="small" @click="openMaterialDialog(null)">
               <el-icon :size="14" style="margin-right: 4px"><Plus /></el-icon>新增物料
             </el-button>
-            <el-input v-model="materialKeyword" placeholder="搜索物料编码或名称"
+            <el-input v-model="materialKeyword" placeholder="搜索物料号或名称"
               clearable size="small" style="width: 240px" @input="loadMaterials" />
             <el-button size="small" @click="exportMaterials">导出 CSV</el-button>
           </div>
@@ -43,12 +43,12 @@
             <el-button type="primary" size="small" @click="openApplianceDialog(null)">
               <el-icon :size="14" style="margin-right: 4px"><Plus /></el-icon>新增器具
             </el-button>
-            <el-input v-model="applianceKeyword" placeholder="搜索物料编码/供应商/型号"
+            <el-input v-model="applianceKeyword" placeholder="搜索物料号/供应商/型号"
               clearable size="small" style="width: 240px" @input="loadAppliances" />
             <el-button size="small" @click="exportAppliances">导出 CSV</el-button>
           </div>
           <el-table :data="applianceList" stripe size="small" v-loading="applianceLoading">
-            <el-table-column prop="materialCode" label="物料编码" width="140" />
+            <el-table-column prop="materialCode" label="物料号" width="140" />
             <el-table-column prop="supplierCode" label="供应商编码" width="160" />
             <el-table-column prop="packType" label="包装器具型号" min-width="150" />
             <el-table-column prop="packCapacity" label="单箱容量" width="90" align="right" />
@@ -186,7 +186,7 @@
     <Teleport to="body">
       <el-dialog v-model="applianceDialogVisible" :title="applianceDialogTitle" width="480px" destroy-on-close>
         <el-form ref="applianceFormRef" :model="applianceForm" :rules="applianceRules" label-width="110px">
-          <el-form-item label="物料编码" prop="materialCode">
+          <el-form-item label="物料号" prop="materialCode">
             <el-input v-model="applianceForm.materialCode" :disabled="!!applianceEditingRow" placeholder="如 M_PART_001" />
           </el-form-item>
           <el-form-item label="供应商编码" prop="supplierCode">
@@ -195,7 +195,7 @@
           <el-form-item label="包装器具型号" prop="packType">
             <el-input v-model="applianceForm.packType" placeholder="如 标准铁箱" />
           </el-form-item>
-          <el-form-item label="单包装容量" prop="packCapacity">
+          <el-form-item label="单箱容量" prop="packCapacity">
             <el-input-number v-model="applianceForm.packCapacity" :min="1" :max="999999"
               controls-position="right" style="width: 100%" />
           </el-form-item>
@@ -258,7 +258,7 @@ const materialForm = reactive({ materialCode: '', materialName: '', supplierCode
 const materialRules = {
   materialCode: [{ required: true, message: '请输入物料号', trigger: 'blur' }],
   materialName: [{ required: true, message: '请输入物料名称', trigger: 'blur' }],
-  supplierCode: [{ required: true, message: '请输入供应商代码', trigger: 'blur' }]
+  supplierCode: [{ required: true, message: '请输入供应商编码', trigger: 'blur' }]
 }
 const materialDialogTitle = computed(() => materialEditingRow.value ? '编辑物料' : '新增物料')
 
@@ -299,10 +299,10 @@ const applianceDeleteTarget = ref(null)
 
 const applianceForm = reactive({ materialCode: '', supplierCode: '', packType: '', packCapacity: 20 })
 const applianceRules = {
-  materialCode: [{ required: true, message: '请输入物料编码', trigger: 'blur' }],
+  materialCode: [{ required: true, message: '请输入物料号', trigger: 'blur' }],
   supplierCode: [{ required: true, message: '请输入供应商编码', trigger: 'blur' }],
   packType: [{ required: true, message: '请输入包装器具型号', trigger: 'blur' }],
-  packCapacity: [{ required: true, message: '请输入单包装容量', trigger: 'blur' }]
+  packCapacity: [{ required: true, message: '请输入单箱容量', trigger: 'blur' }]
 }
 const applianceDialogTitle = computed(() => applianceEditingRow.value ? '编辑器具' : '新增器具')
 
@@ -516,7 +516,7 @@ function exportSuppliers() {
 function exportAppliances() {
   if (!applianceList.value.length) { ElMessage.warning('没有数据可导出'); return }
   exportCSV([
-    { key: 'materialCode', label: '物料编码' },
+    { key: 'materialCode', label: '物料号' },
     { key: 'supplierCode', label: '供应商编码' },
     { key: 'packType', label: '包装器具型号' },
     { key: 'packCapacity', label: '单箱容量' },

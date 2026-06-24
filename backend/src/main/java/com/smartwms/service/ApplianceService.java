@@ -12,7 +12,7 @@ import com.smartwms.entity.Appliance;
 public interface ApplianceService {
 
     /**
-     * 分页查询器具列表，支持按物料编码搜索。
+     * 分页查询器具列表，支持按物料号搜索。
      */
     Page<Appliance> page(int current, int size, String materialCode);
 

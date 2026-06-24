@@ -1,5 +1,5 @@
 /**
- * 库存追溯查询响应 VO，包含条码生命周期轨迹列表。
+ * 库存追溯查询响应 VO，包含二维码生命周期轨迹列表。
  *
  * @author Focus
  * @date 2026-06-10
@@ -35,7 +35,7 @@ public class InventoryTraceVO {
     public void setTotalCount(int totalCount) { this.totalCount = totalCount; }
 
     /**
-     * 单条追溯记录，由条码与入库明细联查组装。
+     * 单条追溯记录，由二维码与入库明细联查组装。
      */
     public static class TraceItem {
 
@@ -54,7 +54,7 @@ public class InventoryTraceVO {
         private String barcodeUpdatedAt;
 
         /**
-         * 从条码和入库明细组装追溯条目。
+         * 从二维码和入库明细组装追溯条目。
          */
         public static TraceItem from(Barcode bc, InboundDetail detail, OutboundHistory outboundHistory) {
             TraceItem item = new TraceItem();

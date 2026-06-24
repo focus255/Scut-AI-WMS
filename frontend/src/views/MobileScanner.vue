@@ -55,12 +55,12 @@ async function onScanned(code) {
 
     switch (mode.value) {
       case 'inbound':
-        if (isOutboundBc) throw new Error('请扫描入库条码')
+        if (isOutboundBc) throw new Error('请扫描入库二维码')
         const ib = await scanInbound({ barcode: code })
         entry.materialCode = ib.materialCode; entry.qty = ib.qty
         break
       case 'outbound':
-        if (!isInboundBc) throw new Error('请扫描WMS入库条码')
+        if (!isInboundBc) throw new Error('请扫描WMS入库二维码')
         // 出库扫码：直接调后端 scanOutbound（不接受 unifiedScan 的自动路由）
         const ob = await request.post('/outbound/scan/wms', { barcode: code })
         entry.materialCode = ob.materialCode; entry.qty = ob.qty

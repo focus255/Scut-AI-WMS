@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 /**
- * 确认出库请求 DTO，支持按明细行传入实际出库条码与数量。
+ * 确认出库请求 DTO，支持按明细行传入实际出库二维码与数量。
  */
 public class ConfirmOutboundRequest {
 
@@ -30,7 +30,7 @@ public class ConfirmOutboundRequest {
         @Min(value = 1, message = "实际出库数量必须大于 0")
         private Integer actualQty;
 
-        @NotEmpty(message = "出库条码不能为空")
+        @NotEmpty(message = "出库二维码不能为空")
         private List<String> barcodes;
 
         public Long getDetailId() { return detailId; }

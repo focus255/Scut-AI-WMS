@@ -23,7 +23,7 @@
         <router-link to="/dashboard" class="nav-item"
           :class="{ active: $route.path === '/dashboard' }" @click="mobileMenuOpen = false">
           <el-icon :size="18"><DataAnalysis /></el-icon>
-          <span class="nav-label">智能看板</span>
+          <span class="nav-label">仪表盘</span>
         </router-link>
         <router-link to="/materials" class="nav-item"
           :class="{ active: $route.path.startsWith('/materials') }" @click="mobileMenuOpen = false">
@@ -48,7 +48,7 @@
         <router-link to="/inventory-trace" class="nav-item"
           :class="{ active: $route.path.startsWith('/inventory-trace') }" @click="mobileMenuOpen = false">
           <el-icon :size="18"><Search /></el-icon>
-          <span class="nav-label">库存追溯</span>
+          <span class="nav-label">库存与看板监控</span>
         </router-link>
         <router-link to="/inbound-history" class="nav-item"
           :class="{ active: $route.path.startsWith('/inbound-history') }" @click="mobileMenuOpen = false">

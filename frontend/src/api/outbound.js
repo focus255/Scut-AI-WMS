@@ -30,7 +30,7 @@ export function getOutboundDetail(id) {
 }
 
 /**
- * 确认出库：按明细行传入实际出库条码与数量。
+ * 确认出库：按明细行传入实际出库二维码与数量。
  * @param {number} id 出库单主键 ID
  * @param {Object} data { details: [{ detailId, actualQty, barcodes }] }
  */
@@ -64,7 +64,7 @@ export function deleteOutbound(id) {
 }
 
 /**
- * 统一扫码：自动判定入库/出库条码并执行对应操作。
+ * 统一扫码：自动判定入库/出库二维码并执行对应操作。
  * @param {Object} data { barcode }
  */
 export function unifiedScan(data) {

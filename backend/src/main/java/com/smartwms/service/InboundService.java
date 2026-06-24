@@ -20,7 +20,7 @@ import java.util.List;
 public interface InboundService {
 
     /**
-     * 创建入库单（生成唯一单号、拆分条码）。
+     * 创建入库单（生成唯一单号、拆分二维码）。
      */
     InboundOrder create(InboundOrderRequest request);
 
@@ -45,7 +45,7 @@ public interface InboundService {
     InboundOrder update(Long id, InboundOrderRequest request);
 
     /**
-     * 手工确认入库（核销明细数量、增加库存、更新条码状态）。
+     * 手工确认入库（核销明细数量、增加库存、更新二维码状态）。
      *
      * @param inboundId 入库单主键 ID
      * @param request   确认请求（含每行实际入库数量）；为 null 时默认按计划数全量入库
@@ -53,7 +53,7 @@ public interface InboundService {
     void confirm(Long inboundId, ConfirmInboundRequest request);
 
     /**
-     * 扫码入库：按条码号精确核销单箱入库。
+     * 扫码入库：按看板号精确核销单箱入库。
      */
     ScanInboundVO scanReceive(ScanInboundRequest request);
 
@@ -63,7 +63,7 @@ public interface InboundService {
     void delete(Long id);
 
     /**
-     * 库存追溯：按物料/条码/入库单号查询条码生命周期轨迹。
+     * 库存追溯：按物料/二维码/入库单号查询二维码生命周期轨迹。
      */
     InventoryTraceVO trace(String materialCode, String barcode, String orderNo);
 }

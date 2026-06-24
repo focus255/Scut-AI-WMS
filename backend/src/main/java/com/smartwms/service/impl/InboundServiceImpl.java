@@ -64,7 +64,7 @@ public class InboundServiceImpl implements InboundService {
     }
 
     /**
-     * 根据物料编码查询器具包装容量。
+     * 根据物料号查询器具包装容量。
      * 优先按 物料+供应商 精确匹配，若未找到则按物料模糊匹配（支持多供应商物料）。
      */
     private int getPackCapacity(String materialCode, String supplierCode) {
@@ -74,7 +74,7 @@ public class InboundServiceImpl implements InboundService {
                         .eq(Appliance::getMaterialCode, materialCode)
                         .eq(Appliance::getSupplierCode, supplierCode)
         );
-        // 回退：按物料编码匹配任意供应商
+        // 回退：按物料号匹配任意供应商
         if (appliance == null) {
             appliance = applianceMapper.selectOne(
                     new LambdaQueryWrapper<Appliance>()
@@ -112,7 +112,7 @@ public class InboundServiceImpl implements InboundService {
 
         String supplierCode = request.getSupplierCode();
 
-        // 创建明细并生成条码（整箱，每箱一个条码）
+        // 创建明细并生成二维码（整箱，每箱一个二维码）
         for (InboundOrderRequest.InboundDetailItem item : request.getDetails()) {
             int packCapacity = getPackCapacity(item.getMaterialCode(), supplierCode);
             int boxCount = item.getBoxCount() != null ? item.getBoxCount() : 0;
@@ -131,7 +131,7 @@ public class InboundServiceImpl implements InboundService {
             detail.setActualQty(0);
             inboundDetailMapper.insert(detail);
 
-            // 每箱生成一条条码
+            // 每箱生成一条二维码
             for (int i = 0; i < boxCount; i++) {
                 String barcodeStr = buildBarcode(item.getMaterialCode(), supplierCode, planQty,
                         packCapacity, planQty, i + 1, orderNo);
@@ -227,7 +227,7 @@ public class InboundServiceImpl implements InboundService {
             detail.setActualQty(actualQty);
             inboundDetailMapper.updateById(detail);
 
-            // 按入库单 ID 精确匹配条码，更新状态为在库
+            // 按入库单 ID 精确匹配二维码，更新状态为在库
             var barcodes = barcodeMapper.selectList(
                     new LambdaQueryWrapper<Barcode>()
                             .eq(Barcode::getInboundId, inboundId)
@@ -279,13 +279,13 @@ public class InboundServiceImpl implements InboundService {
                         .eq(InboundDetail::getInboundId, id)
         );
 
-        // 删除旧条码（按入库单 ID 精确删除）
+        // 删除旧二维码（按入库单 ID 精确删除）
         barcodeMapper.delete(
                 new LambdaQueryWrapper<Barcode>()
                         .eq(Barcode::getInboundId, id)
         );
 
-        // 重新创建明细和条码（整箱逻辑）
+        // 重新创建明细和二维码（整箱逻辑）
         String orderNo = order.getOrderNo();
         for (InboundOrderRequest.InboundDetailItem item : request.getDetails()) {
             int packCapacity = getPackCapacity(item.getMaterialCode(), supplierCode);
@@ -333,25 +333,25 @@ public class InboundServiceImpl implements InboundService {
     public ScanInboundVO scanReceive(ScanInboundRequest request) {
         String barcodeStr = request.getBarcode().trim();
 
-        // 查找已有条码
+        // 查找已有二维码
         Barcode barcode = barcodeMapper.selectOne(
                 new LambdaQueryWrapper<Barcode>()
                         .eq(Barcode::getBarcode, barcodeStr)
         );
 
-        // —— 条码不存在：解析创建新条码并关联入库单 ——
+        // —— 二维码不存在：解析创建新二维码并关联入库单 ——
         if (barcode == null) {
             barcode = createBarcodeFromScan(barcodeStr);
         }
 
-        // 校验条码状态
+        // 校验二维码状态
         if ("在库".equals(barcode.getStatus())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST,
-                    "条码 " + barcodeStr + " 已入库，无需重复操作");
+                    "二维码 " + barcodeStr + " 已入库，无需重复操作");
         }
         if ("已出库".equals(barcode.getStatus())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST,
-                    "条码 " + barcodeStr + " 已出库，不可入库");
+                    "二维码 " + barcodeStr + " 已出库，不可入库");
         }
 
         // 入库核销
@@ -376,10 +376,10 @@ public class InboundServiceImpl implements InboundService {
         boolean hasBarcode = barcode != null && !barcode.isEmpty();
         boolean hasOrderNo = orderNo != null && !orderNo.isEmpty();
         if (!hasMaterial && !hasBarcode && !hasOrderNo) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "请提供至少一个查询条件（物料编码/条码号/入库单号）");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请提供至少一个查询条件（物料号/看板号/入库单号）");
         }
 
-        // 如果指定了入库单号，先查入库单 ID，再通过 inboundId 查条码
+        // 如果指定了入库单号，先查入库单 ID，再通过 inboundId 查二维码
         Long inboundId = null;
         if (hasOrderNo) {
             InboundOrder order = inboundOrderMapper.selectOne(
@@ -391,7 +391,7 @@ public class InboundServiceImpl implements InboundService {
             }
         }
 
-        // 按条件查询条码（仅入库类型，排除出库标签）
+        // 按条件查询二维码（仅入库类型，排除出库标签）
         LambdaQueryWrapper<Barcode> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Barcode::getType, "inbound");
         if (hasMaterial) {
@@ -434,10 +434,10 @@ public class InboundServiceImpl implements InboundService {
     // ==================== 扫码入库辅助方法 ====================
 
     /**
-     * 从未知条码中解析入库数据并自动创建入库单和条码记录。
+     * 从未知二维码中解析入库数据并自动创建入库单和二维码记录。
      *
      * 新格式（推荐）：WMS|物料|供应商|计划数|箱容量|实收数|箱号
-     * 旧格式（兼容）：以 "-" 分隔的旧式条码，提取物料编码后使用默认值
+     * 旧格式（兼容）：以 "-" 分隔的旧式二维码，提取物料号后使用默认值
      */
     private Barcode createBarcodeFromScan(String barcodeStr) {
         String materialCode;
@@ -457,14 +457,14 @@ public class InboundServiceImpl implements InboundService {
                 actualQtyFromBarcode = parseIntSafe(parts[5], packCapacity);
             } else {
                 throw new BusinessException(ErrorCode.BAD_REQUEST,
-                        "条码格式错误（WMS|物料|供应商|计划数|箱容量|实收数|箱号），当前仅有 " + parts.length + " 个字段");
+                        "二维码格式错误（WMS|物料|供应商|计划数|箱容量|实收数|箱号），当前仅有 " + parts.length + " 个字段");
             }
         } else {
-            // 兼容旧格式：从字符串中提取物料编码，使用默认值
+            // 兼容旧格式：从字符串中提取物料号，使用默认值
             materialCode = extractMaterialCode(barcodeStr);
             if (materialCode == null) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST,
-                        "条码 " + barcodeStr + " 格式不正确，无法识别物料编码。请使用 WMS|物料|供应商|计划|箱容|实收|箱号 格式。");
+                        "二维码 " + barcodeStr + " 格式不正确，无法识别物料号。请使用 WMS|物料|供应商|计划|箱容|实收|箱号 格式。");
             }
             supplierCode = null;
             planQty = 1;
@@ -482,12 +482,12 @@ public class InboundServiceImpl implements InboundService {
                     "物料 " + materialCode + " 不存在，请先在物料管理中创建该物料。");
         }
 
-        // 供应商：优先条码中的值，其次物料默认供应商
+        // 供应商：优先二维码中的值，其次物料默认供应商
         if (supplierCode == null || supplierCode.isEmpty()) {
             supplierCode = material.getSupplierCode();
         }
 
-        // 优先从 Appliance 表获取 packCapacity，若条码自带的值更可靠则以条码为准
+        // 优先从 Appliance 表获取 packCapacity，若二维码自带的值更可靠则以二维码为准
         if (packCapacity <= 1) {
             Appliance appliance = applianceMapper.selectOne(
                     new LambdaQueryWrapper<Appliance>()
@@ -543,7 +543,7 @@ public class InboundServiceImpl implements InboundService {
             inboundDetailMapper.insert(detail);
         }
 
-        // 创建条码记录（整箱 remainingQty = packCapacity）
+        // 创建二维码记录（整箱 remainingQty = packCapacity）
         Barcode barcode = new Barcode();
         barcode.setBarcode(barcodeStr);
         barcode.setMaterialCode(materialCode);
@@ -578,7 +578,7 @@ public class InboundServiceImpl implements InboundService {
         try { return Integer.parseInt(s.trim()); } catch (Exception e) { return defaultVal; }
     }
 
-    /** 从旧格式条码中提取物料编码（向后兼容） */
+    /** 从旧格式二维码中提取物料号（向后兼容） */
     private String extractMaterialCode(String barcodeStr) {
         java.util.regex.Matcher m = java.util.regex.Pattern
                 .compile("(M_PART_\\d+|MATERIAL_\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE)
@@ -588,7 +588,7 @@ public class InboundServiceImpl implements InboundService {
     }
 
     /**
-     * 执行条码核销入库（提取自原 scanReceive 方法）。
+     * 执行二维码核销入库（提取自原 scanReceive 方法）。
      */
     private ScanInboundVO doScanReceive(Barcode barcode, Integer requestedQty) {
         // 获取关联的入库明细
@@ -605,7 +605,7 @@ public class InboundServiceImpl implements InboundService {
         int actualQty = requestedQty != null ? requestedQty
                 : (detail != null && detail.getPackCapacity() != null ? detail.getPackCapacity() : 1);
 
-        // 更新条码状态
+        // 更新二维码状态
         barcode.setStatus("在库");
         barcodeMapper.updateById(barcode);
 

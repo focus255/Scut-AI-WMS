@@ -1,6 +1,6 @@
 /**
  * 库存封存记录实体（对应 inventory_freezes 表）。
- * 封存：暂停条码流转；解封：恢复为在库。
+ * 封存：暂停二维码流转；解封：恢复为在库。
  *
  * @author Focus
  * @date 2026-06-23
@@ -16,13 +16,13 @@ public class InventoryFreeze {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    /** 关联条码 ID */
+    /** 关联二维码 ID */
     private Long barcodeId;
 
-    /** 物料编码（冗余，便于查询） */
+    /** 物料号（冗余，便于查询） */
     private String materialCode;
 
-    /** 条码号 */
+    /** 看板号 */
     private String barcode;
 
     /** 封存类型：QUALITY（质量问题）/ ADMIN（管理封存）/ OTHER */

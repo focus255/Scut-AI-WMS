@@ -153,7 +153,7 @@ public class DataInitializer implements CommandLineRunner {
         // 5. 库存（覆盖 NORMAL / LOW_STOCK / HIGH / DEAD_STOCK 四种水位）
         seedInventories();
 
-        // 5.5. 为种子库存生成虚拟入库单和条码，确保所有物料可追溯时间、支持 FIFO
+        // 5.5. 为种子库存生成虚拟入库单和二维码，确保所有物料可追溯时间、支持 FIFO
         seedBarcodesForInventory();
 
         // 5.6. 扩充出库历史流水（120天跨度，支撑日均消耗计算与呆滞检测）
@@ -430,7 +430,7 @@ public class DataInitializer implements CommandLineRunner {
     /**
      * 插入库存记录（含安全库存与补货提前期参数）。
      *
-     * @param code         物料编码
+     * @param code         物料号
      * @param qty          当前库存量
      * @param minDays      低储控制天数（用于前端参考显示）
      * @param maxDays      高储控制天数（DOHF上限）
@@ -452,17 +452,17 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 
-    // ==================== 种子库存 → 虚拟入库单 + 条码（FIFO 时间追溯） ====================
+    // ==================== 种子库存 → 虚拟入库单 + 二维码（FIFO 时间追溯） ====================
 
     /**
-     * 为种子库存的每种物料生成一条虚拟入库单和对应条码。
+     * 为种子库存的每种物料生成一条虚拟入库单和对应二维码。
      * 入库时间按物料序号错开（每往前一天一批），同一入库单内各箱时间逐毫秒递增。
      * 确保所有库存物料都有可追溯的时间戳，满足 FIFO 先进先出排序。
      */
     private void seedBarcodesForInventory() {
-        // 跳过已有条码的物料（避免重复初始化）
+        // 跳过已有二维码的物料（避免重复初始化）
         if (barcodeMapper.selectCount(null) > 0) {
-            log.info("[初始化] 条码表已有数据，跳过种子条码生成");
+            log.info("[初始化] 二维码表已有数据，跳过种子二维码生成");
             return;
         }
 
@@ -519,7 +519,7 @@ public class DataInitializer implements CommandLineRunner {
             detail.setActualQty(stockQty);
             inboundDetailMapper.insert(detail);
 
-            // 生成条码（每箱一个，整箱模式：每箱 remainingQty = packCapacity）
+            // 生成二维码（每箱一个，整箱模式：每箱 remainingQty = packCapacity）
             int boxCount = stockQty / packCapacity; // 整箱模式确保整除
             for (int boxSeq = 1; boxSeq <= boxCount; boxSeq++) {
                 String barcode = String.format("WMS|%s|%s|%d|%d|%d|%d",
@@ -542,7 +542,7 @@ public class DataInitializer implements CommandLineRunner {
                 updateBc.setCreatedAt(barcodeTime);
                 barcodeMapper.updateById(updateBc);
             }
-            log.info("[初始化] 物料 {} 生成 {} 箱种子条码（入库时间: {}）", materialCode, boxCount, orderTime);
+            log.info("[初始化] 物料 {} 生成 {} 箱种子二维码（入库时间: {}）", materialCode, boxCount, orderTime);
         }
     }
 
@@ -613,7 +613,7 @@ public class DataInitializer implements CommandLineRunner {
     /**
      * 为单个物料生成一系列出库历史记录。
      *
-     * @param materialCode 物料编码
+     * @param materialCode 物料号
      * @param packCapacity 包装容量
      * @param avgDailyUse  近30天目标日均消耗（件/天）
      * @param stopDaysAgo  最后一条出库距今天数（呆滞物料设为大值）
@@ -861,7 +861,7 @@ public class DataInitializer implements CommandLineRunner {
             detail1.setPlanQty(200);
             detail1.setActualQty(200);
             inboundDetailMapper.insert(detail1);
-            // 生成条码（已完成 → "在库"）
+            // 生成二维码（已完成 → "在库"）
             seedBarcodes(order1, detail1, "在库");
 
             InboundOrder order2 = new InboundOrder();
@@ -879,7 +879,7 @@ public class DataInitializer implements CommandLineRunner {
             detail2.setPlanQty(150);
             detail2.setActualQty(0);
             inboundDetailMapper.insert(detail2);
-            // 生成条码（未入库 → "待入库"）
+            // 生成二维码（未入库 → "待入库"）
             seedBarcodes(order2, detail2, "待入库");
 
             InboundOrder order3 = new InboundOrder();
@@ -897,15 +897,15 @@ public class DataInitializer implements CommandLineRunner {
             detail3.setPlanQty(120);
             detail3.setActualQty(120);
             inboundDetailMapper.insert(detail3);
-            // 生成条码（已完成 → "在库"）
+            // 生成二维码（已完成 → "在库"）
             seedBarcodes(order3, detail3, "在库");
 
-            log.info("[初始化] 创建 3 条入库单（2 已完成 + 1 未入库），含条码");
+            log.info("[初始化] 创建 3 条入库单（2 已完成 + 1 未入库），含二维码");
         }
     }
 
     /**
-     * 为一条入库明细生成条码记录（整箱模式）。
+     * 为一条入库明细生成二维码记录（整箱模式）。
      */
     private void seedBarcodes(InboundOrder order, InboundDetail detail, String status) {
         int boxCount = detail.getPlanQty() / detail.getPackCapacity();
@@ -935,7 +935,7 @@ public class DataInitializer implements CommandLineRunner {
 
         LocalDateTime now = LocalDateTime.now();
 
-        // --- 已完成出库单 M_PART_001（200件=10箱），扣减对应入库条码 ---
+        // --- 已完成出库单 M_PART_001（200件=10箱），扣减对应入库二维码 ---
         OutboundOrder o1 = createOutboundOrder("CK" + now.minusDays(5).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS")),
                 "已完成", now.minusDays(5), "M_PART_001", 20, 200, 200, 10);
 
@@ -959,7 +959,7 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     /**
-     * 创建一条出库单，关联真实入库条码。
+     * 创建一条出库单，关联真实入库二维码。
      * @param pickBoxes 拣货箱数（<= 该物料在库整箱数）
      */
     private OutboundOrder createOutboundOrder(String orderNo, String status, LocalDateTime createdAt,
@@ -979,7 +979,7 @@ public class DataInitializer implements CommandLineRunner {
         detail.setActualQty(actualQty);
         outboundDetailMapper.insert(detail);
 
-        // 查找该物料的在库条码，按 FIFO 选取 pickBoxes 个
+        // 查找该物料的在库二维码，按 FIFO 选取 pickBoxes 个
         List<Barcode> barcodes = barcodeMapper.selectList(
                 new LambdaQueryWrapper<Barcode>()
                         .eq(Barcode::getType, "inbound")

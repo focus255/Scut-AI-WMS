@@ -42,7 +42,7 @@
 
 | 目标 | 说明 |
 | :--- | :--- |
-| **夯实 WMS 基础能力** | 实现物料、器具包装、供应商等基础数据的增删改查，支持完整的入库、出库、条码流转全链路手工及单据操作。 |
+| **夯实 WMS 基础能力** | 实现物料、器具包装、供应商等基础数据的增删改查，支持完整的入库、出库、二维码流转全链路手工及单据操作。 |
 | **精细化库存水位控制** | 支持物料高储、低储天数的精细化配置，并在动态库存报表中直观呈现水位状态。 |
 | **融合大语言模型智能化预测** | 对接大语言模型 API，实现库存断供风险和滞销积压风险的智能预测。 |
 | **自动生成决策报告** | 基于 AI 分析结果，自动产出结构化的补货建议与异常物料分析报告，支持一键转补货计划。 |
@@ -54,7 +54,7 @@
 | 角色 | 职责描述 |
 | :--- | :--- |
 | **仓储主管 / 规划员** | 负责高低储规则维护、库存报表审阅，深度使用 AI 风险预测与补货建议功能进行采购与库存调配决策。 |
-| **仓库操作员** | 负责日常入库单制作、物料条码打印、手工出入库核销等现场作业。 |
+| **仓库操作员** | 负责日常入库单制作、物料二维码打印、手工出入库核销等现场作业。 |
 
 ---
 
@@ -81,7 +81,7 @@
 │  [业务服务层 Service]                                              │
 │   ├── UserService (用户登录、预置账号校验)                          │
 │   ├── BaseInfoService (物料、器具包装、供应商档案维护)              │
-│   ├── InoutService (入库单生成、条码打印、出库单核销、库存动态增减)  │
+│   ├── InoutService (入库单生成、二维码打印、出库单核销、库存动态增减)  │
 │   ├── StockService (库存报表多维检索、高低储水位动态计算)           │
 │   └── LLMIdentifyService (大模型Prompt动态拼装、异步线程池调度、Mock兜底) │
 │                                                                   │
@@ -105,7 +105,7 @@
 | :--- | :--- |
 | **auth-component** | 负责系统用户的登录认证、密码 BCrypt 加密、JWT 生成与统一拦截校验。 |
 | **baseinfo-component** | 维护仓库核心静态主数据，包括物料表、器具表、供应商表，提供基础增删改查。 |
-| **wms-core-component** | 承载核心仓储物流流转，负责入库单（及明细）、出库单（及明细）的手工创建与状态变更，绑定条码表实现库存扣减。 |
+| **wms-core-component** | 承载核心仓储物流流转，负责入库单（及明细）、出库单（及明细）的手工创建与状态变更，绑定二维码表实现库存扣减。 |
 | **stock-alarm-component** | 结合高低储天数参数与零件需求导入，动态计算并输出实时库存报表与高低储预警标记。 |
 | **ai-intelligence-component** | 智能预测核心。负责拼装包含库存快照与未来需求的 Prompt，通过线程池执行异步调用 LLM，解析并回写库存风险分析与补货报告。提供大模型不可用时的 Mock 规则引擎。 |
 
@@ -127,14 +127,14 @@
 #### 入库流转
 
 1. 选择供应商与零件，创建入库单，系统生成 `inbound_orders` 记录，状态默认为 **"未入库"**。
-2. 自动或手工根据器具包装容量拆分并生成物料对应的条码记录存入 `barcodes` 表。
+2. 自动或手工根据器具包装容量拆分并生成物料对应的二维码记录存入 `barcodes` 表。
 3. 操作员执行"手工入库确认"，系统更新 `inbound_details` 中的实际入库数量。
 4. 当明细全部核销，入库单更新为 **"已完成"**，同时原子性地增加 `inventories` 表中的实物库存量。
 
 #### 出库流转
 
 1. 导入零件未来需求或选择具体零件，填写计划出库数量，生成出库单（状态为 **"未出库"**）。
-2. 仓库作业人员按先进先出（FIFO）或指定物料条码核销，输入实际出库数。
+2. 仓库作业人员按先进先出（FIFO）或指定物料二维码核销，输入实际出库数。
 3. 确认出库后，出库单状态变更为 **"已完成"**，系统同步扣减 `inventories` 表中对应的库存余额。
 
 ### 3.3 高低储与滞销风险判断流程
@@ -205,13 +205,13 @@
 ### 4.2 基础信息管理功能
 
 - **物料主数据维护**：支持对工厂内周转的物料进行基础建档，包含物料号（唯一键）、物料名称、默认供应商。
-- **器具 / 包装管理**：定义不同物料对应的标准工位器具。字段包括器具型号、单包装容量（如 1 箱装 20 个零件），用以指导入库时条码的自动拆分规则。
+- **器具 / 包装管理**：定义不同物料对应的标准工位器具。字段包括器具型号、单包装容量（如 1 箱装 20 个零件），用以指导入库时二维码的自动拆分规则。
 - **供应商档案维护**：统一维护配套供应商数据，包括供应商代码（唯一键）、供应商全称。
 
 ### 4.3 入出库及库存管理功能
 
-- **手工入库流转**：创建入库单 → 增加物料明细（计划入库数） → 确认入库（回填实际入库数，条码变为"在库"状态） → 动态刷新对应物料的物理库存。
-- **手工出库作业**：创建出库单 → 关联零件与计划出库数 → 现场出库确认（核销对应条码或扣减总数） → 扣减对应物料库存。
+- **手工入库流转**：创建入库单 → 增加物料明细（计划入库数） → 确认入库（回填实际入库数，二维码变为"在库"状态） → 动态刷新对应物料的物理库存。
+- **手工出库作业**：创建出库单 → 关联零件与计划出库数 → 现场出库确认（核销对应二维码或扣减总数） → 扣减对应物料库存。
 - **零件需求导入**：支持通过前端组件或模拟文本导入未来 7 天或 15 天的下游整车/总成"零件预测需求数"，用以提供给库存报表及 AI 进行断供风险的深度推演。
 - **动态库存报表**：综合物料、供应商、当前物理库存、已维护的高低储天数进行集中多维展示。
 
@@ -231,7 +231,7 @@
 
 【已知基础事实】:
 
-物料编码与名称: ${materialCode}(${materialName})
+物料号与名称: ${materialCode}(${materialName})
 
 配套供应商: ${supplierName}
 
@@ -406,7 +406,7 @@
 | 服务 | 说明 |
 | :--- | :--- |
 | **MaterialService** | 提供带有条件构造器（`QueryWrapper`）的分页查询。 |
-| **InboundService & OutboundService** | 使用 Spring 的 `@Transactional(rollbackFor = Exception.class)` 强事务注解。保证更新单据明细状态、新增条码明细与扣减/增加 `inventories` 中的物理库存数量在同一个 MySQL 事务中执行。任何一步失败（如出库发生超扣、负库存违规）全面回滚。 |
+| **InboundService & OutboundService** | 使用 Spring 的 `@Transactional(rollbackFor = Exception.class)` 强事务注解。保证更新单据明细状态、新增二维码明细与扣减/增加 `inventories` 中的物理库存数量在同一个 MySQL 事务中执行。任何一步失败（如出库发生超扣、负库存违规）全面回滚。 |
 
 ### 6.3 AI 智能预测引擎模块（Asynchronous Engine）
 
@@ -525,7 +525,7 @@ public class LLMIdentifyServiceImpl implements LLMIdentifyService {
 
 | 参数 | 类型 | 必填 | 说明 |
 | :--- | :--- | :--- | :--- |
-| `materialCode` | String | 否 | 物料编码模糊检索 |
+| `materialCode` | String | 否 | 物料号模糊检索 |
 | `alarmStatus` | String | 否 | 内置水位状态过滤：`NORMAL` / `LOW` / `HIGH` |
 
 **返回数据示例**：
@@ -753,20 +753,20 @@ CREATE TABLE `outbound_details` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='出库单行项目明细表';
 ```
 
-### 8.8 条码信息表：`barcodes`
+### 8.8 二维码信息表：`barcodes`
 
-支持条码辅助流转。
+支持二维码辅助流转。
 
 ```sql
 CREATE TABLE `barcodes` (
   `id`            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
   `material_code` VARCHAR(100) NOT NULL COMMENT '零件编码',
   `supplier_code` VARCHAR(100) NOT NULL COMMENT '生产供应商',
-  `barcode`       VARCHAR(150) NOT NULL UNIQUE COMMENT '唯一箱单标签条码号',
-  `status`        VARCHAR(50) NOT NULL DEFAULT '待入库' COMMENT '条码生命周期: 待入库 / 在库 / 已出库',
+  `barcode`       VARCHAR(150) NOT NULL UNIQUE COMMENT '唯一箱单标签看板号',
+  `status`        VARCHAR(50) NOT NULL DEFAULT '待入库' COMMENT '二维码生命周期: 待入库 / 在库 / 已出库',
   `created_at`    DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物料器具条码追踪表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物料器具二维码追踪表';
 ```
 
 ### 8.9 AI 库存预测报告表：`ai_inventory_reports`
@@ -803,7 +803,7 @@ CREATE TABLE `ai_inventory_reports` (
 | 7 | `inbound_details` | 入库单行项目明细表 |
 | 8 | `outbound_orders` | 物料出库单主表 |
 | 9 | `outbound_details` | 出库单行项目明细表 |
-| 10 | `barcodes` | 物料器具条码追踪表 |
+| 10 | `barcodes` | 物料器具二维码追踪表 |
 | 11 | `ai_inventory_reports` | AI 库存推演与智能决策报告表 |
 
 ---
@@ -1010,10 +1010,10 @@ services:
 
 | 需要注释的场景 | 示例 |
 | :--- | :--- |
-| **业务逻辑背景** | `// 先进先出（FIFO）核销：按条码创建时间升序扣减，确保老批次优先出库` |
+| **业务逻辑背景** | `// 先进先出（FIFO）核销：按二维码创建时间升序扣减，确保老批次优先出库` |
 | **复杂算法说明** | `// 使用加权移动平均法计算日均消耗，权重随天数递减以突出近期趋势` |
 | **临时解决方案** | `// TODO(开发者, 2026-06-15): 当前为桩实现，后续对接真实大模型 API 替换` |
-| **性能考量** | `// 批量插入条码记录，避免逐条 insert 导致 200+ 次数据库往返` |
+| **性能考量** | `// 批量插入二维码记录，避免逐条 insert 导致 200+ 次数据库往返` |
 | **非显而易见的设计决策** | `// 使用 CallerRunsPolicy 而非 AbortPolicy：AI 预测非核心链路，拒绝时在调用者线程执行降级，保证主业务不受阻` |
 
 **禁止添加无意义的注释**，例如：
@@ -1096,7 +1096,7 @@ public void confirm(Long inboundId) {
  * 触发物料 AI 风险预测（异步）。
  * 调用后立即返回 PENDING 状态，实际推演在后台线程池执行。
  *
- * @param {string} materialCode 物料编码
+ * @param {string} materialCode 物料号
  * @returns {Promise<{reportId: number, predictionStatus: string}>}
  */
 export function triggerPredict(materialCode) {
@@ -1180,7 +1180,7 @@ export function triggerPredict(materialCode) {
  *
  * @author <开发者姓名>
  * @date 2026-06-03
- * @param materialCode 物料编码
+ * @param materialCode 物料号
  * @param qty          扣减数量
  * @throws BusinessException 当库存不足时抛出（code=3001）
  * @see com.smartwms.service.StockService#getStockReport 库存报表查询

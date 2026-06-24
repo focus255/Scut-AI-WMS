@@ -1,5 +1,5 @@
 /**
- * 物料器具条码追踪实体（对应 barcodes 表）。
+ * 物料器具二维码追踪实体（对应 barcodes 表）。
  *
  * @author Focus
  * @date 2026-06-03
@@ -15,25 +15,25 @@ public class Barcode {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    /** 零件编码 */
+    /** 物料号 */
     private String materialCode;
 
     /** 生产供应商 / OUT（出库标签时） */
     private String supplierCode;
 
-    /** 唯一箱单标签条码号 */
+    /** 唯一箱单标签看板号 */
     private String barcode;
 
-    /** 来源单据 ID：入库条码时为入库单 ID，出库标签时为出库单 ID（字段名 inboundId 因历史原因保留） */
+    /** 来源单据 ID：入库二维码时为入库单 ID，出库标签时为出库单 ID（字段名 inboundId 因历史原因保留） */
     private Long inboundId;
 
-    /** 条码类型：inbound（入库条码）/ outbound（出库标签） */
+    /** 二维码类型：inbound（入库二维码）/ outbound（出库标签） */
     private String type;
 
-    /** 条码生命周期：待入库/在库/已出库（入库）；待出库/已出库（出库） */
+    /** 二维码生命周期：待入库/在库/已出库（入库）；待出库/已出库（出库） */
     private String status;
 
-    /** 当前剩余数量（入库条码拆箱后余量，出库标签为单箱数量） */
+    /** 当前剩余数量（入库二维码拆箱后余量，出库标签为单箱数量） */
     private Integer remainingQty;
 
     @TableField(fill = FieldFill.INSERT)

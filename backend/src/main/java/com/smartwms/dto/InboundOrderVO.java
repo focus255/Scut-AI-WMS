@@ -26,7 +26,7 @@ public class InboundOrderVO {
     private List<Barcode> barcodes;
 
     /**
-     * 从 InboundOrder 实体构造 VO（含明细行与条码列表）。
+     * 从 InboundOrder 实体构造 VO（含明细行与二维码列表）。
      */
     public static InboundOrderVO from(InboundOrder order, List<InboundDetail> details, List<Barcode> barcodes) {
         InboundOrderVO vo = new InboundOrderVO();

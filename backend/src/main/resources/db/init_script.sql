@@ -155,22 +155,22 @@ CREATE TABLE IF NOT EXISTS `outbound_histories` (
   `inbound_id`         BIGINT NOT NULL COMMENT '来源入库单主表ID',
   `inbound_order_no`   VARCHAR(100) NOT NULL COMMENT '来源入库单号',
   `inbound_detail_id`  BIGINT NOT NULL COMMENT '来源入库明细ID',
-  `barcode_id`         BIGINT NOT NULL COMMENT '实际出库条码ID',
-  `barcode`            VARCHAR(150) NOT NULL COMMENT '实际出库条码号',
+  `barcode_id`         BIGINT NOT NULL COMMENT '实际出库二维码ID',
+  `barcode`            VARCHAR(150) NOT NULL COMMENT '实际出库看板号',
   `deduct_qty`         INT NOT NULL COMMENT '本次扣减数量',
   `created_at`         DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 15. 物料器具条码追踪表
+-- 15. 物料器具二维码追踪表
 CREATE TABLE IF NOT EXISTS `barcodes` (
   `id`            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
   `material_code` VARCHAR(100) NOT NULL COMMENT '零件编码',
   `supplier_code` VARCHAR(100) NOT NULL COMMENT '生产供应商 / OUT',
-  `barcode`       VARCHAR(150) NOT NULL UNIQUE COMMENT '唯一箱单标签条码号',
-  `inbound_id`    BIGINT DEFAULT NULL COMMENT '关联入库单主键ID（入库条码）/ 关联出库单主键ID（出库标签）',
-  `type`          VARCHAR(20) NOT NULL DEFAULT 'inbound' COMMENT '条码类型: inbound(入库条码) / outbound(出库标签)',
-  `status`        VARCHAR(50) NOT NULL DEFAULT '待入库' COMMENT '条码生命周期: 待入库/在库/已出库(入库条码) | 待出库/已出库(出库标签)',
-  `remaining_qty` INT NOT NULL DEFAULT 0 COMMENT '当前剩余数量（入库条码拆箱后余量，出库标签为单箱数量）',
+  `barcode`       VARCHAR(150) NOT NULL UNIQUE COMMENT '唯一箱单标签看板号',
+  `inbound_id`    BIGINT DEFAULT NULL COMMENT '关联入库单主键ID（入库二维码）/ 关联出库单主键ID（出库标签）',
+  `type`          VARCHAR(20) NOT NULL DEFAULT 'inbound' COMMENT '二维码类型: inbound(入库二维码) / outbound(出库标签)',
+  `status`        VARCHAR(50) NOT NULL DEFAULT '待入库' COMMENT '二维码生命周期: 待入库/在库/已出库(入库二维码) | 待出库/已出库(出库标签)',
+  `remaining_qty` INT NOT NULL DEFAULT 0 COMMENT '当前剩余数量（入库二维码拆箱后余量，出库标签为单箱数量）',
   `created_at`    DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -194,9 +194,9 @@ CREATE TABLE IF NOT EXISTS `ai_inventory_reports` (
 -- 17. 库存封存记录表
 CREATE TABLE IF NOT EXISTS `inventory_freezes` (
   `id`            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
-  `barcode_id`    BIGINT NOT NULL COMMENT '关联条码ID',
+  `barcode_id`    BIGINT NOT NULL COMMENT '关联二维码ID',
   `material_code` VARCHAR(100) NOT NULL COMMENT '物料编码',
-  `barcode`       VARCHAR(150) NOT NULL COMMENT '条码号',
+  `barcode`       VARCHAR(150) NOT NULL COMMENT '看板号',
   `freeze_type`   VARCHAR(50) NOT NULL DEFAULT 'QUALITY' COMMENT '封存类型: QUALITY/ADMIN/OTHER',
   `reason`        VARCHAR(255) NOT NULL COMMENT '封存原因',
   `operator`      VARCHAR(100) DEFAULT 'admin' COMMENT '操作人',

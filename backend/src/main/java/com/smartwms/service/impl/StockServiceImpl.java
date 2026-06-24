@@ -53,7 +53,7 @@ public class StockServiceImpl implements StockService {
     public List<StockReportVO> getStockReport(String materialCode, String alarmStatus) {
         LambdaQueryWrapper<Inventory> wrapper = new LambdaQueryWrapper<>();
 
-        // 物料编码模糊检索
+        // 物料号模糊检索
         if (materialCode != null && !materialCode.isEmpty()) {
             wrapper.like(Inventory::getMaterialCode, materialCode);
         }
@@ -114,7 +114,7 @@ public class StockServiceImpl implements StockService {
         if (lastOutboundDate != null) {
             idleDays = (int) ChronoUnit.DAYS.between(lastOutboundDate, LocalDateTime.now());
         } else {
-            // 从未出库过，以最早入库条码时间作为起始参考点
+            // 从未出库过，以最早入库二维码时间作为起始参考点
             LocalDateTime firstInbound = getFirstInboundDate(inv.getMaterialCode());
             if (firstInbound != null) {
                 idleDays = (int) ChronoUnit.DAYS.between(firstInbound, LocalDateTime.now());
@@ -217,9 +217,9 @@ public class StockServiceImpl implements StockService {
     }
 
     /**
-     * 获取物料最早入库条码日期（用于从未出库的物料计算闲置起点）。
+     * 获取物料最早入库二维码日期（用于从未出库的物料计算闲置起点）。
      *
-     * @return 最早入库时间，若条码表也无记录则返回 null
+     * @return 最早入库时间，若二维码表也无记录则返回 null
      */
     private LocalDateTime getFirstInboundDate(String materialCode) {
         Barcode first = barcodeMapper.selectOne(

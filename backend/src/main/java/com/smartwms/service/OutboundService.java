@@ -28,8 +28,8 @@ public interface OutboundService {
     Page<OutboundHistoryVO> pageHistories(int current, int size, String orderNo, String materialCode);
 
     /**
-     * 扫码出库：解析出库标签条码，按 FIFO 选取仓库条码并核销。
-     * @param barcodeStr 出库标签条码字符串
+     * 扫码出库：解析出库标签二维码，按 FIFO 选取仓库二维码并核销。
+     * @param barcodeStr 出库标签二维码字符串
      * @return 统一扫码响应
      */
     ScanResponse scanOutbound(String barcodeStr);

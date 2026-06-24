@@ -1,5 +1,5 @@
 <!--
-  智能库存看板首页 — 工作台风格（含图表 + 动态流 + 实时告警）。
+  仪表盘首页 — 工作台风格（含图表 + 动态流 + 实时告警）。
   @author Focus
   @date 2026-06-03
 -->
@@ -78,7 +78,7 @@
 
 <script setup>
 /**
- * 智能看板 — 统计概览 + 图表 + 库存水位 + AI 速查 + 扫码入库 + 动态流 + 实时告警。
+ * 仪表盘 — 统计概览 + 图表 + 库存水位 + AI 速查 + 扫码入库 + 动态流 + 实时告警。
  */
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { getStockReport } from '@/api/stock'

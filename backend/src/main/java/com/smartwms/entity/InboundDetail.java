@@ -21,7 +21,7 @@ public class InboundDetail {
     /** 关联业务单号 */
     private String orderNo;
 
-    /** 入库零件号 */
+    /** 物料号 */
     private String materialCode;
 
     /** 包装容量快照 */

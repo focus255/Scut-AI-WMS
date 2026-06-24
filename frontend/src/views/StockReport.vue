@@ -17,7 +17,7 @@
 
     <div class="content-block">
       <div class="toolbar">
-        <el-input v-model="filterCode" placeholder="物料编码模糊检索" clearable size="small"
+        <el-input v-model="filterCode" placeholder="物料号模糊检索" clearable size="small"
           style="width: 220px" @input="loadReport" />
         <el-select v-model="filterStatus" placeholder="水位状态" clearable size="small"
           style="width: 140px" @change="loadReport">

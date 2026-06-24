@@ -179,7 +179,7 @@ public class LLMIdentifyServiceImpl implements LLMIdentifyService {
 
     /**
      * 计算物料闲置天数（自最后一次出库至今）。
-     * 若从未出库，则以最早入库条码日期为参考起点。
+     * 若从未出库，则以最早入库二维码日期为参考起点。
      */
     private int computeIdleDays(String materialCode) {
         // 查询最后出库日期
@@ -194,7 +194,7 @@ public class LLMIdentifyServiceImpl implements LLMIdentifyService {
         if (last != null) {
             referenceDate = last.getCreatedAt();
         } else {
-            // 从未出库，以最早入库条码时间为参考
+            // 从未出库，以最早入库二维码时间为参考
             Barcode first = barcodeMapper.selectOne(
                     new LambdaQueryWrapper<Barcode>()
                             .eq(Barcode::getMaterialCode, materialCode)

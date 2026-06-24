@@ -26,7 +26,7 @@ public class ApplianceServiceImpl implements ApplianceService {
     }
 
     /**
-     * 分页查询，支持按物料编码、供应商编码、包装类型模糊搜索。
+     * 分页查询，支持按物料号、供应商编码、包装类型模糊搜索。
      */
     @Override
     public Page<Appliance> page(int current, int size, String materialCode) {
@@ -90,11 +90,11 @@ public class ApplianceServiceImpl implements ApplianceService {
     }
 
     /**
-     * 校验物料编码、供应商编码、包装类型、包装容量为必填。
+     * 校验物料号、供应商编码、包装类型、包装容量为必填。
      */
     private void validateRequiredFields(Appliance appliance) {
         if (!StringUtils.hasText(appliance.getMaterialCode())) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "请输入物料编码");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请输入物料号");
         }
         if (!StringUtils.hasText(appliance.getSupplierCode())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请输入供应商编码");

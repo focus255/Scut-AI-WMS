@@ -10,8 +10,8 @@ import jakarta.validation.constraints.NotBlank;
 
 public class ScanInboundRequest {
 
-    /** 扫描或手动输入的条码号 */
-    @NotBlank(message = "条码不能为空")
+    /** 扫描或手动输入的看板号 */
+    @NotBlank(message = "二维码不能为空")
     private String barcode;
 
     /** 实际入库数量（可选，默认按箱容量入库） */

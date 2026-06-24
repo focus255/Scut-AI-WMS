@@ -8,7 +8,7 @@ import request from './request'
 
 /**
  * 触发物料 AI 风险预测（异步）。
- * @param {string} materialCode 物料编码
+ * @param {string} materialCode 物料号
  */
 export function triggerPredict(materialCode) {
   return request.post('/ai/predict', { materialCode })
@@ -16,7 +16,7 @@ export function triggerPredict(materialCode) {
 
 /**
  * 查询指定物料的最新 AI 分析报告。
- * @param {string} materialCode 物料编码
+ * @param {string} materialCode 物料号
  */
 export function getLatestReport(materialCode) {
   return request.get('/ai/reports/latest', { params: { materialCode } })

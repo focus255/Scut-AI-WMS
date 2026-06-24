@@ -14,7 +14,7 @@ public interface LLMIdentifyService {
      * 触发物料的异步 AI 库存风险预测。
      * 先创建 PENDING 状态的报告记录，再提交异步任务执行推演。
      *
-     * @param materialCode 物料编码
+     * @param materialCode 物料号
      * @return 新创建的 AI 报告记录（含报告 ID 和 PENDING 状态）
      */
     AiReport triggerPredict(String materialCode);

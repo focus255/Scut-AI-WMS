@@ -13,7 +13,7 @@
       <!-- 工具栏 -->
       <div class="toolbar">
         <el-button type="primary" size="small" @click="openSealDialog">
-          <el-icon :size="14"><Lock /></el-icon> 封存条码
+          <el-icon :size="14"><Lock /></el-icon> 封存二维码
         </el-button>
         <el-input v-model="searchMaterial" placeholder="物料号" size="small" clearable
           style="width: 160px" @keyup.enter="loadList" />
@@ -28,7 +28,7 @@
       <!-- 封存记录表 -->
       <el-table :data="freezeList" stripe size="small" v-loading="loading"
         empty-text="暂无封存记录" @row-click="openEditDialog" style="cursor: pointer">
-        <el-table-column prop="barcode" label="条码号" min-width="240" show-overflow-tooltip />
+        <el-table-column prop="barcode" label="看板号" min-width="240" show-overflow-tooltip />
         <el-table-column prop="materialCode" label="物料号" width="140" />
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
@@ -67,11 +67,11 @@
 
     <!-- 封存对话框 -->
     <Teleport to="body">
-      <el-dialog v-model="sealVisible" title="封存条码" width="500px" destroy-on-close>
+      <el-dialog v-model="sealVisible" title="封存二维码" width="500px" destroy-on-close>
         <el-form :model="sealForm" label-width="80px">
-          <el-form-item label="条码列表" required>
+          <el-form-item label="二维码列表" required>
             <el-input v-model="sealForm.barcodeInput" type="textarea" :rows="4"
-              placeholder="输入条码号，每行一个或用逗号/空格分隔" />
+              placeholder="输入看板号，每行一个或用逗号/空格分隔" />
           </el-form-item>
           <el-form-item label="封存类型" required>
             <el-select v-model="sealForm.freezeType" placeholder="选择封存类型" style="width: 100%">
@@ -96,7 +96,7 @@
     <Teleport to="body">
       <el-dialog v-model="editVisible" title="封存详情" width="500px" destroy-on-close>
         <el-form :model="editForm" label-width="80px" v-if="editForm.id">
-          <el-form-item label="条码号">
+          <el-form-item label="看板号">
             <span class="form-text">{{ editForm.barcode }}</span>
           </el-form-item>
           <el-form-item label="物料号">
@@ -178,14 +178,14 @@ function openSealDialog() {
   sealVisible.value = true
 }
 
-/** 解析用户输入的条码（逗号/空格/换行分隔） */
+/** 解析用户输入的二维码（逗号/空格/换行分隔） */
 function parseBarcodeInput(input) {
   return input.split(/[,，\s\n\r]+/).map(s => s.trim()).filter(Boolean)
 }
 
 async function handleSeal() {
   const barcodes = parseBarcodeInput(sealForm.barcodeInput)
-  if (barcodes.length === 0) { ElMessage.warning('请输入至少一个条码号'); return }
+  if (barcodes.length === 0) { ElMessage.warning('请输入至少一个看板号'); return }
   if (!sealForm.reason.trim()) { ElMessage.warning('请填写封存原因'); return }
   sealSubmitting.value = true
   try {
@@ -194,7 +194,7 @@ async function handleSeal() {
       freezeType: sealForm.freezeType,
       reason: sealForm.reason.trim()
     })
-    ElMessage.success(`成功封存 ${barcodes.length} 个条码`)
+    ElMessage.success(`成功封存 ${barcodes.length} 个二维码`)
     sealVisible.value = false
     loadList()
   } catch (err) {
@@ -228,7 +228,7 @@ async function handleEditSave() {
 
 async function handleEditUnseal() {
   try {
-    await ElMessageBox.confirm(`确定解封条码 ${editForm.barcode}？`, '确认解封', { type: 'warning' })
+    await ElMessageBox.confirm(`确定解封二维码 ${editForm.barcode}？`, '确认解封', { type: 'warning' })
     await request.post('/freeze/unseal', null, { params: { barcode: editForm.barcode } })
     ElMessage.success('解封成功')
     editVisible.value = false
@@ -238,7 +238,7 @@ async function handleEditUnseal() {
 
 async function handleUnseal(row) {
   try {
-    await ElMessageBox.confirm(`确定解封条码 ${row.barcode}？`, '确认解封', { type: 'warning' })
+    await ElMessageBox.confirm(`确定解封二维码 ${row.barcode}？`, '确认解封', { type: 'warning' })
     await request.post('/freeze/unseal', null, { params: { barcode: row.barcode } })
     ElMessage.success('解封成功')
     loadList()

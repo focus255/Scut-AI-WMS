@@ -118,11 +118,11 @@ public class OutboundController {
     }
 
     /**
-     * 统一扫码入口：自动判定条码类型（入库/出库）并执行对应操作。
+     * 统一扫码入口：自动判定二维码类型（入库/出库）并执行对应操作。
      * 出库标签格式: OUT|<materialCode>|<outboundOrderNo>|<packCapacity>|<planQty>|<boxQty>|<boxSeq>
-     * 入库条码格式: WMS|<materialCode>|<supplierCode>|<planQty>|<packCapacity>|<actualQty>|<boxSeq>
+     * 入库二维码格式: WMS|<materialCode>|<supplierCode>|<planQty>|<packCapacity>|<actualQty>|<boxSeq>
      */
-    /** 出库专用扫码（WMS条码，仅接受待出库状态） */
+    /** 出库专用扫码（WMS二维码，仅接受待出库状态） */
     @PostMapping("/scan/wms")
     public Result<ScanResponse> scanOutboundWms(@Valid @RequestBody ScanInboundRequest request) {
         return Result.success("扫码出库成功", outboundService.scanOutbound(request.getBarcode().trim()));
@@ -134,7 +134,7 @@ public class OutboundController {
         if (barcode.startsWith("OUT|")) {
             return Result.success("扫码出库成功", outboundService.scanOutbound(barcode));
         }
-        // WMS 条码：按状态分派。待出库→出库核销，其他→入库核销
+        // WMS 二维码：按状态分派。待出库→出库核销，其他→入库核销
         Barcode bc = barcodeMapper.selectOne(
                 new LambdaQueryWrapper<Barcode>().eq(Barcode::getBarcode, barcode)
         );

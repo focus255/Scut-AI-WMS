@@ -46,7 +46,7 @@ export function confirmInbound(id, details) {
 }
 
 /**
- * 扫码入库：按条码号精确核销单箱入库。
+ * 扫码入库：按看板号精确核销单箱入库。
  * @param {Object} data { barcode, actualQty? }
  */
 export function scanInbound(data) {
@@ -54,7 +54,7 @@ export function scanInbound(data) {
 }
 
 /**
- * 库存追溯：按物料/条码/入库单号查询条码生命周期轨迹。
+ * 库存与看板监控：按物料/二维码/入库单号查询二维码生命周期轨迹。
  * @param {Object} params { materialCode?, barcode?, orderNo? }
  */
 export function getInventoryTrace(params) {

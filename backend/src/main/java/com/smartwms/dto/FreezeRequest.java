@@ -12,7 +12,7 @@ import java.util.List;
 
 public class FreezeRequest {
 
-    @NotEmpty(message = "条码列表不能为空")
+    @NotEmpty(message = "二维码列表不能为空")
     private List<String> barcodes;
 
     @NotBlank(message = "封存类型不能为空")

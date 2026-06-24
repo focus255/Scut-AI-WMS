@@ -53,7 +53,7 @@ async function loadRecords() {
       })
     } catch { /* */ }
 
-    // 出库历史流水（含物料号、条码、数量）
+    // 出库历史流水（含物料号、二维码、数量）
     try {
       const ob = await request.get('/outbound/histories', { params: { page: 1, size: 50 } })
       ;(ob.records || []).forEach(r => {
@@ -63,7 +63,7 @@ async function loadRecords() {
       })
     } catch { /* */ }
 
-    // 封存记录（含物料号、条码）
+    // 封存记录（含物料号、二维码）
     try {
       const fz = await request.get('/freeze/list', { params: { page: 1, size: 30 } })
       ;(fz.records || []).forEach(r => {

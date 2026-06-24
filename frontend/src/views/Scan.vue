@@ -55,7 +55,7 @@
         <div class="qr-row"><span class="qr-label">物料号</span><span class="qr-value">{{ scanResult.materialCode }}</span></div>
         <div class="qr-row" v-if="scanResult.orderNo"><span class="qr-label">{{ scanMode === 'outbound' ? '出库单号' : '入库单号' }}</span><span class="qr-value">{{ scanResult.orderNo }}</span></div>
         <div class="qr-row" v-if="scanResult.qty"><span class="qr-label">数量</span><span class="qr-value">{{ scanResult.qty }} 件</span></div>
-        <div class="qr-row"><span class="qr-label">条码</span><span class="qr-value" style="font-size:11px;word-break:break-all">{{ scanResult.barcode }}</span></div>
+        <div class="qr-row"><span class="qr-label">二维码</span><span class="qr-value" style="font-size:11px;word-break:break-all">{{ scanResult.barcode }}</span></div>
       </div>
       <div v-if="scanError" class="scan-error">
         <el-icon :size="16"><WarningFilled /></el-icon>
@@ -108,7 +108,7 @@ async function onBarcodeScanned(code) {
         ElMessage.success(`入库成功：${ibData.materialCode}，${ibData.qty} 件`)
         break
       case 'outbound':
-        if (!isInbound) { scanError.value = '出库请扫描入库条码（WMS|...），OUT标签已废弃'; return }
+        if (!isInbound) { scanError.value = '出库请扫描入库二维码（WMS|...），OUT标签已废弃'; return }
         const obData = await unifiedScan({ barcode: code })
         scanResult.value = { ...obData, barcode: code }
         ElMessage.success(`出库成功：${obData.materialCode}，${obData.qty} 件`)

@@ -622,7 +622,7 @@
     <Teleport to="body">
       <el-dialog v-model="outConfirmVisible" title="确认出库"
         width="min(800px, calc(100vw - 32px))" destroy-on-close>
-        <el-alert title="系统将自动按先进先出 (FIFO) 规则校验条码，请确保按入库先后顺序选择条码。"
+        <el-alert title="系统将自动按先进先出 (FIFO) 规则校验二维码，请确保按入库先后顺序选择二维码。"
           type="info" show-icon :closable="false" style="margin-bottom: 12px" />
         <div class="confirm-info">
           <span class="confirm-label">出库单号：</span>
@@ -646,7 +646,7 @@
                 size="small" controls-position="right" style="width: 110px" />
             </template>
           </el-table-column>
-          <el-table-column label="出库条码" min-width="220">
+          <el-table-column label="出库二维码" min-width="220">
             <template #default="{ row }">
               <div class="barcode-tag-area">
                 <el-tag v-for="(bc, i) in (row._barcodes || [])" :key="i"
@@ -654,7 +654,7 @@
                   @close="removeOutBarcode(row, i)">
                   {{ bc }}
                 </el-tag>
-                <el-input v-model="row._barcodeInput" placeholder="扫描/输入条码后回车"
+                <el-input v-model="row._barcodeInput" placeholder="扫描/输入二维码后回车"
                   size="small" class="barcode-input-inline"
                   @keyup.enter="addOutBarcode(row)"
                   @blur="addOutBarcode(row)" />
@@ -664,7 +664,7 @@
         </el-table>
         <template #footer>
           <div class="dialog-footer">
-            <span class="footer-tip">请逐行扫描或输入出库条码，系统将校验 FIFO 规则。</span>
+            <span class="footer-tip">请逐行扫描或输入出库二维码，系统将校验 FIFO 规则。</span>
             <div>
               <el-button @click="outConfirmVisible = false">取消</el-button>
               <el-button type="primary" :loading="outConfirmSubmitting" @click="handleOutConfirmSubmit">
@@ -704,7 +704,7 @@
           <el-table-column prop="planQty" label="计划数" width="100" align="center" />
           <el-table-column prop="actualQty" label="实出数" width="100" align="center" />
         </el-table>
-        <!-- 出库看板（一码到底：显示已拣选的入库条码） -->
+        <!-- 出库看板（一码到底：显示已拣选的入库二维码） -->
         <div v-if="outDetailData && outDetailData.barcodes && outDetailData.barcodes.length > 0"
           class="barcode-gallery">
           <div class="barcode-gallery-title">出库看板（共 {{ outDetailData.barcodes.length }} 个）</div>
@@ -725,7 +725,7 @@
           style="margin-top: 16px">
           <div class="barcode-gallery-title">出库流水（共 {{ outDetailData.histories.length }} 条）</div>
           <el-table :data="outDetailData.histories" stripe size="small">
-            <el-table-column prop="barcode" label="条码号" min-width="260" show-overflow-tooltip />
+            <el-table-column prop="barcode" label="看板号" min-width="260" show-overflow-tooltip />
             <el-table-column prop="inboundOrderNo" label="来源入库单号" width="200" show-overflow-tooltip />
             <el-table-column prop="deductQty" label="扣减数量" width="90" align="right" />
             <el-table-column prop="createdAt" label="出库时间" width="170" show-overflow-tooltip />
@@ -860,7 +860,7 @@
           <el-table-column prop="outboundOrderNo" label="出库单号" width="200" show-overflow-tooltip />
           <el-table-column prop="materialCode" label="物料号" width="130" />
           <el-table-column prop="inboundOrderNo" label="来源入库单号" width="200" show-overflow-tooltip />
-          <el-table-column prop="barcode" label="条码号" min-width="260" show-overflow-tooltip />
+          <el-table-column prop="barcode" label="看板号" min-width="260" show-overflow-tooltip />
           <el-table-column prop="deductQty" label="扣减数量" width="90" align="right" />
           <el-table-column prop="createdAt" label="出库时间" width="170" show-overflow-tooltip />
         </el-table>
@@ -1089,7 +1089,7 @@ async function searchMaterials(query, idx) {
 
 /**
  * 当物料被选中时，自动从器具配置获取包装容量和器具类型（只读）。
- * 按物料编码匹配，不限定供应商。
+ * 按物料号匹配，不限定供应商。
  */
 async function fetchPackCapacity(idx, materialCode) {
   if (!materialCode) {
@@ -1384,7 +1384,7 @@ function setLabelRef(barcode, el) {
 }
 
 /**
- * 从条码字符串中提取用于文件名的物料编码和箱号。
+ * 从二维码字符串中提取用于文件名的物料号和箱号。
  */
 function parseBarcodeForFilename(str) {
   const parts = (str || '').split('|')
@@ -1440,7 +1440,7 @@ function downloadOutLabel(bc, event) {
   const canvas = component.getCanvas()
   if (!canvas) return
 
-  // 从条码字符串解析箱号: OUT|MAT|CK20260615...|15|90|15|3 → boxSeq=7
+  // 从二维码字符串解析箱号: OUT|MAT|CK20260615...|15|90|15|3 → boxSeq=7
   const parts = (bc.barcode || '').split('|')
   const boxSeq = parts.length >= 7 ? parts[6] : '1'
   const orderNo = outDetailData.value?.orderNo || 'CK'
@@ -1740,7 +1740,7 @@ async function openOutConfirmDialog(row) {
 }
 
 /**
- * 将条码输入框中的值添加为条码标签。
+ * 将二维码输入框中的值添加为二维码标签。
  * 支持扫码枪回车输入和手动粘贴（按逗号/空格/换行分割）。
  */
 function addOutBarcode(row) {
@@ -1762,10 +1762,10 @@ function removeOutBarcode(row, idx) {
 }
 
 async function handleOutConfirmSubmit() {
-  // 校验：每条明细的条码折算数量应与本次出库数一致
+  // 校验：每条明细的二维码折算数量应与本次出库数一致
   for (const row of outConfirmDetails.value) {
     if (row._confirmQty > 0 && (!row._barcodes || row._barcodes.length === 0)) {
-      ElMessage.warning(`物料 ${row.materialCode} 本次出库数大于 0，请扫描或输入条码`)
+      ElMessage.warning(`物料 ${row.materialCode} 本次出库数大于 0，请扫描或输入二维码`)
       return
     }
   }
@@ -1789,7 +1789,7 @@ async function handleOutConfirmSubmit() {
     outConfirmVisible.value = false
     loadOutboundOrders()
   } catch (err) {
-    ElMessage.error(err.message || '出库确认失败，请检查条码是否正确且符合先进先出规则')
+    ElMessage.error(err.message || '出库确认失败，请检查二维码是否正确且符合先进先出规则')
   } finally {
     outConfirmSubmitting.value = false
   }
@@ -2560,7 +2560,7 @@ function onOutEditDialogOpened() {
   font-weight: 500;
 }
 
-/* ==================== 出库条码输入区 ==================== */
+/* ==================== 出库二维码输入区 ==================== */
 .barcode-tag-area {
   display: flex;
   flex-wrap: wrap;
