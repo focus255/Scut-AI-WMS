@@ -1224,26 +1224,58 @@ function openInboundDialog() {
   dialogVisible.value = true
 }
 
-function applyAiInboundDraft() {
+async function applyAiInboundDraft() {
   const materialCode = String(route.query.materialCode || '').trim()
   const suggestedQty = Number(route.query.suggestedQty || 0)
   if (!materialCode || suggestedQty <= 0) return
 
   isAiDraft.value = true
   activeTab.value = 'inbound'
-  inboundForm.selectedSuppliers = []
+  router.replace({ path: route.path, query: {} })
+
+  // 查找物料默认供应商和包装容量
+  let supplierCode = ''
+  let packCapacity = 20
+  let packType = ''
+  try {
+    // 查物料默认供应商
+    const matData = await getMaterials({ page: 1, size: 100, keyword: materialCode })
+    const mat = (matData.records || []).find(r => r.materialCode === materialCode)
+    if (mat) supplierCode = mat.supplierCode || ''
+
+    // 查器具包装容量
+    if (supplierCode) {
+      try {
+        const appData = await getAppliances({ page: 1, size: 10, keyword: materialCode })
+        const app = (appData.records || []).find(r =>
+          r.materialCode === materialCode && r.supplierCode === supplierCode)
+        if (app) {
+          packCapacity = app.packCapacity || 20
+          packType = app.packType || ''
+        }
+      } catch { /* */ }
+    }
+  } catch { /* */ }
+
+  // 按建议量计算箱数（向上取整）
+  const boxCount = Math.max(1, Math.ceil(suggestedQty / packCapacity))
+
+  inboundForm.selectedSuppliers = supplierCode ? [supplierCode] : []
   inboundForm.details = [{
     materialCode,
-    packType: '',
-    packCapacity: 0,
-    boxCount: 1
+    packType,
+    packCapacity,
+    boxCount
   }]
   catalogMaterials.value = []
   materialOptions.value = {}
   dialogVisible.value = true
-  ElMessage.info('已根据 AI 建议预填入库物料，请添加供应商后自动获取单箱容量')
 
-  router.replace({ path: route.path, query: {} })
+  if (supplierCode) {
+    ElMessage.success(`AI 建议补货 ${suggestedQty} 件，已自动填入 ${boxCount} 箱（${packCapacity}件/箱）`)
+  } else {
+    ElMessage.info(`AI 建议补货 ${suggestedQty} 件，请手动添加供应商`)
+  }
 }
 
 async function handleCreate() {
