@@ -21,7 +21,7 @@
             <el-select v-model="inboundStatus" placeholder="状态" size="small" clearable
               style="width: 110px" @change="loadInboundHistory">
               <el-option label="已完成" value="已完成" />
-              <el-option label="未入库" value="未入库" />
+              <el-option label="未完成" value="未完成" />
             </el-select>
             <el-input v-model="inboundKeyword" placeholder="单号/供应商" size="small" clearable
               style="width: 160px" @keyup.enter="loadInboundHistory" />
@@ -62,8 +62,8 @@
             <el-select v-model="outboundStatus" placeholder="状态" size="small" clearable
               style="width: 110px" @change="loadOutboundHistory">
               <el-option label="已完成" value="已完成" />
-              <el-option label="未出库" value="未出库" />
-              <el-option label="部分出库" value="部分出库" />
+              <el-option label="未完成" value="未完成" />
+              <el-option label="部分完成" value="部分完成" />
             </el-select>
             <el-input v-model="outboundKeyword" placeholder="单号" size="small" clearable
               style="width: 160px" @keyup.enter="loadOutboundHistory" />
@@ -135,7 +135,7 @@ const outboundSummary = reactive({ totalBatches: 0, totalQty: 0 })
 
 function outStatusClass(s) {
   if (s === '已完成') return 'badge-success'
-  if (s === '部分出库') return 'badge-warn'
+  if (s === '部分完成') return 'badge-warn'
   return 'badge-default'
 }
 

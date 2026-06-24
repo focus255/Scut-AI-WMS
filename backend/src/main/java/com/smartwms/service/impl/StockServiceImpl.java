@@ -114,7 +114,7 @@ public class StockServiceImpl implements StockService {
         if (lastOutboundDate != null) {
             idleDays = (int) ChronoUnit.DAYS.between(lastOutboundDate, LocalDateTime.now());
         } else {
-            // 从未出库过，以最早入库二维码时间作为起始参考点
+            // 从未完成过，以最早入库二维码时间作为起始参考点
             LocalDateTime firstInbound = getFirstInboundDate(inv.getMaterialCode());
             if (firstInbound != null) {
                 idleDays = (int) ChronoUnit.DAYS.between(firstInbound, LocalDateTime.now());
@@ -204,7 +204,7 @@ public class StockServiceImpl implements StockService {
     /**
      * 获取物料最后一次出库日期。
      *
-     * @return 最后出库时间，若从未出库则返回 null
+     * @return 最后出库时间，若从未完成则返回 null
      */
     private LocalDateTime getLastOutboundDate(String materialCode) {
         OutboundHistory last = outboundHistoryMapper.selectOne(
@@ -217,7 +217,7 @@ public class StockServiceImpl implements StockService {
     }
 
     /**
-     * 获取物料最早入库二维码日期（用于从未出库的物料计算闲置起点）。
+     * 获取物料最早入库二维码日期（用于从未完成的物料计算闲置起点）。
      *
      * @return 最早入库时间，若二维码表也无记录则返回 null
      */

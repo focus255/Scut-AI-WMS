@@ -414,20 +414,20 @@ DROP PROCEDURE IF EXISTS seed_warehouse_flow;
 DROP PROCEDURE IF EXISTS gen_barcodes;
 
 
--- ==================== 7. 补充：未入库单据（含"待入库"二维码，展示完整看板） ====================
+-- ==================== 7. 补充：未完成单据（含"待入库"二维码，展示完整看板） ====================
 
 SET @inbound_seq = @inbound_seq + 1;
 INSERT IGNORE INTO inbound_orders (order_no, status, supplier_code, created_at) VALUES
 (CONCAT('RK', DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 HOUR), '%Y%m%d'), LPAD(@inbound_seq, 4, '0')),
- '未入库', 'SUP_BOSCH_01', DATE_SUB(NOW(), INTERVAL 1 HOUR));
+ '未完成', 'SUP_BOSCH_01', DATE_SUB(NOW(), INTERVAL 1 HOUR));
 
-SET @pending_order_no = (SELECT order_no FROM inbound_orders WHERE status = '未入库' ORDER BY id DESC LIMIT 1);
+SET @pending_order_no = (SELECT order_no FROM inbound_orders WHERE status = '未完成' ORDER BY id DESC LIMIT 1);
 SET @pending_order_id = (SELECT id FROM inbound_orders WHERE order_no = @pending_order_no);
 
 INSERT IGNORE INTO inbound_details (inbound_id, order_no, material_code, pack_capacity, plan_qty, actual_qty)
 VALUES (@pending_order_id, @pending_order_no, 'M_PART_003', 50, 150, 0);
 
--- 为未入库单生成"待入库"二维码（3箱，可展示在入库看板上）
+-- 为未完成单生成"待入库"二维码（3箱，可展示在入库看板上）
 INSERT IGNORE INTO barcodes (material_code, supplier_code, barcode, inbound_id, type, status, remaining_qty, created_at)
 VALUES
 ('M_PART_003', 'SUP_BOSCH_01', CONCAT('WMS|M_PART_003|SUP_BOSCH_01|150|50|50|', LPAD(@inbound_seq, 4, '0'), '-1'),

@@ -106,7 +106,7 @@ public class InboundServiceImpl implements InboundService {
 
         InboundOrder order = new InboundOrder();
         order.setOrderNo(orderNo);
-        order.setStatus("未入库");
+        order.setStatus("未完成");
         order.setSupplierCode(request.getSupplierCode());
         inboundOrderMapper.insert(order);
 
@@ -344,14 +344,23 @@ public class InboundServiceImpl implements InboundService {
             barcode = createBarcodeFromScan(barcodeStr);
         }
 
-        // 校验二维码状态
-        if ("在库".equals(barcode.getStatus())) {
+        // 校验二维码状态：仅「待入库」或新建二维码可入库
+        String status = barcode.getStatus();
+        if ("在库".equals(status)) {
             throw new BusinessException(ErrorCode.BAD_REQUEST,
                     "二维码 " + barcodeStr + " 已入库，无需重复操作");
         }
-        if ("已出库".equals(barcode.getStatus())) {
+        if ("已出库".equals(status)) {
             throw new BusinessException(ErrorCode.BAD_REQUEST,
                     "二维码 " + barcodeStr + " 已出库，不可入库");
+        }
+        if ("待出库".equals(status)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST,
+                    "二维码 " + barcodeStr + " 已被出库单拣选，不可入库。请先取消出库单");
+        }
+        if ("FROZEN".equals(status)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST,
+                    "二维码 " + barcodeStr + " 已被封存，不可入库。请先解封");
         }
 
         // 入库核销
@@ -363,8 +372,8 @@ public class InboundServiceImpl implements InboundService {
     public void delete(Long id) {
         InboundOrder order = inboundOrderMapper.selectById(id);
         if (order == null) throw new BusinessException(ErrorCode.NOT_FOUND, "入库单不存在");
-        if (!"未入库".equals(order.getStatus()))
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "仅未入库状态的入库单可删除");
+        if (!"未完成".equals(order.getStatus()))
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "仅未完成状态的入库单可删除");
         inboundDetailMapper.delete(new LambdaQueryWrapper<InboundDetail>().eq(InboundDetail::getInboundId, id));
         barcodeMapper.delete(new LambdaQueryWrapper<Barcode>().eq(Barcode::getInboundId, id));
         inboundOrderMapper.deleteById(id);
@@ -499,7 +508,7 @@ public class InboundServiceImpl implements InboundService {
             }
         }
 
-        // 查找可复用的未入库订单（actualQty < planQty 说明还有未收完的）
+        // 查找可复用的未完成订单（actualQty < planQty 说明还有未收完的）
         InboundOrder order = null;
         List<InboundDetail> pendingDetails = inboundDetailMapper.selectList(
                 new LambdaQueryWrapper<InboundDetail>()
@@ -509,7 +518,7 @@ public class InboundServiceImpl implements InboundService {
         );
         if (!pendingDetails.isEmpty()) {
             InboundOrder candidate = inboundOrderMapper.selectById(pendingDetails.get(0).getInboundId());
-            if (candidate != null && "未入库".equals(candidate.getStatus())) {
+            if (candidate != null && "未完成".equals(candidate.getStatus())) {
                 order = candidate;
             }
         }
@@ -529,7 +538,7 @@ public class InboundServiceImpl implements InboundService {
 
             order = new InboundOrder();
             order.setOrderNo(orderNo);
-            order.setStatus("未入库");
+            order.setStatus("未完成");
             order.setSupplierCode(supplierCode);
             inboundOrderMapper.insert(order);
 

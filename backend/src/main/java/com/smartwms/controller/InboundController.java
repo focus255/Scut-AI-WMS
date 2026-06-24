@@ -65,7 +65,7 @@ public class InboundController {
     }
 
     /**
-     * 修改入库单（仅"未入库"状态可修改）。
+     * 修改入库单（仅"未完成"状态可修改）。
      * PUT /api/inbound/orders/{id}
      */
     @PutMapping("/orders/{id}")
@@ -88,7 +88,7 @@ public class InboundController {
     }
 
     /**
-     * 删除入库单（仅"未入库"状态可删除）。
+     * 删除入库单（仅"未完成"状态可删除）。
      * DELETE /api/inbound/orders/{id}
      */
     @DeleteMapping("/orders/{id}")

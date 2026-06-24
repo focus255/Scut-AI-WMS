@@ -18,7 +18,7 @@ public class OutboundOrder {
     /** 出库业务单号（全局唯一） */
     private String orderNo;
 
-    /** 出库单状态：未出库 / 已完成 */
+    /** 出库单状态：未完成 / 已完成 */
     private String status;
 
     @TableField(fill = FieldFill.INSERT)

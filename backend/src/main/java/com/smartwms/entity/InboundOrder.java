@@ -18,7 +18,7 @@ public class InboundOrder {
     /** 手工入库单号（全局唯一） */
     private String orderNo;
 
-    /** 入库状态：未入库 / 已完成 */
+    /** 入库状态：未完成 / 已完成 */
     private String status;
 
     /** 对应发货供应商 */

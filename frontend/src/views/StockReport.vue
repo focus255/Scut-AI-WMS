@@ -70,13 +70,6 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" align="center">
-          <template #default="{ row }">
-            <el-button type="primary" link size="small"
-              :loading="predicting === row.materialCode"
-              @click="handlePredict(row)">AI 推演</el-button>
-          </template>
-        </el-table-column>
       </el-table>
     </div>
   </div>
@@ -84,18 +77,16 @@
 
 <script setup>
 /**
- * 库存报表 — 图表 + 筛选 + 颜色高亮 + AI 推演 + 导出。
+ * 库存报表 — 图表 + 筛选 + 导出。
  */
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getStockReport } from '@/api/stock'
-import { triggerPredict } from '@/api/ai'
 import { exportCSV } from '@/utils/export'
 import ChartCard from '@/components/ChartCard.vue'
 
 const reportData = ref([])
 const loading = ref(false)
-const predicting = ref(null)
 const filterCode = ref('')
 const filterStatus = ref('')
 
@@ -107,12 +98,6 @@ async function loadReport() {
     const data = await getStockReport({ materialCode: filterCode.value || undefined, alarmStatus: filterStatus.value || undefined })
     reportData.value = data || []
   } catch { ElMessage.error('加载报表失败') } finally { loading.value = false }
-}
-
-async function handlePredict(row) {
-  predicting.value = row.materialCode
-  try { await triggerPredict(row.materialCode); ElMessage.success(`物料 ${row.materialCode} AI 预测已启动`) }
-  catch { ElMessage.error('启动失败') } finally { predicting.value = null }
 }
 
 function badgeClass(v) {

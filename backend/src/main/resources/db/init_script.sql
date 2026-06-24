@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS `inventories` (
 CREATE TABLE IF NOT EXISTS `inbound_orders` (
   `id`            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
   `order_no`      VARCHAR(100) NOT NULL UNIQUE COMMENT '手工入库单号(全局唯一)',
-  `status`        VARCHAR(50) NOT NULL DEFAULT '未入库' COMMENT '入库状态: 未入库 / 已完成',
+  `status`        VARCHAR(50) NOT NULL DEFAULT '未完成' COMMENT '入库状态: 未完成 / 已完成',
   `supplier_code` VARCHAR(100) NOT NULL COMMENT '对应发货供应商',
   `created_at`    DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS `inbound_details` (
 CREATE TABLE IF NOT EXISTS `outbound_orders` (
   `id`         BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
   `order_no`   VARCHAR(100) NOT NULL UNIQUE COMMENT '出库业务单号',
-  `status`     VARCHAR(50) NOT NULL DEFAULT '未出库' COMMENT '出库单状态: 未出库 / 已完成',
+  `status`     VARCHAR(50) NOT NULL DEFAULT '未完成' COMMENT '出库单状态: 未完成 / 已完成',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );

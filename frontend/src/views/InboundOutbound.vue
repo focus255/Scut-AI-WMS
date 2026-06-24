@@ -85,7 +85,7 @@
                   @click.stop="openOutEditDialog(row)">
                   编辑
                 </el-button>
-                <el-button v-if="row.status === '未出库'" type="danger" link size="small"
+                <el-button v-if="row.status === '未完成'" type="danger" link size="small"
                   @click.stop="handleOutDelete(row)">
                   删除
                 </el-button>
@@ -328,6 +328,7 @@
               <BoxLabel :ref="el => setLabelRef(bc.barcode, el)"
                 :barcode="bc.barcode"
                 :created-at="bc.createdAt" />
+              <div class="label-stamp" :class="'stamp-' + stampClass(bc.status)">{{ bc.status }}</div>
             </div>
           </div>
         </div>
@@ -509,6 +510,7 @@
                 <div v-for="bc in printOrder.barcodes" :key="bc.barcode" class="label-print-item">
                   <BoxLabel :barcode="bc.barcode"
                     :created-at="bc.createdAt" />
+                  <div class="label-stamp" :class="'stamp-' + stampClass(bc.status)">{{ bc.status || '在库' }}</div>
                 </div>
               </div>
             </div>
@@ -735,6 +737,7 @@
               <BoxLabel :ref="el => setOutLabelRef(bc.barcode, el)"
                 :barcode="bc.barcode"
                 :created-at="bc.createdAt" />
+              <div class="label-stamp" :class="'stamp-' + stampClass(bc.status)">{{ bc.status }}</div>
             </div>
           </div>
         </div>
@@ -1609,8 +1612,14 @@ const outCompletedCount = computed(() => outboundList.value.filter(r => r.status
 
 function outStatusClass(status) {
   if (status === '已完成') return 'badge-success'
-  if (status === '部分出库') return 'badge-warn'
+  if (status === '部分完成') return 'badge-warn'
   return 'badge-default'
+}
+function stampClass(s) {
+  if (s === '在库') return 'in'
+  if (s === '已出库') return 'out'
+  if (s === '待入库' || s === '待出库') return 'pending'
+  return 'default'
 }
 
 async function loadOutboundOrders() {
@@ -2446,6 +2455,7 @@ function onOutEditDialogOpened() {
   gap: 12px;
 }
 .label-card {
+  position: relative;
   cursor: pointer;
   transition: box-shadow 0.15s;
   border-radius: 4px;
@@ -2476,6 +2486,32 @@ function onOutEditDialogOpened() {
 .tag-in-stock { background: #f0f9eb; color: #67c23a; }
 .tag-pending { background: #fdf6ec; color: #e6a23c; }
 .tag-outbound { background: #f4f4f5; color: #909399; }
+
+/* ==================== 看板状态印章 ==================== */
+.label-stamp {
+  display: inline-block;
+  font-size: 11px; font-weight: 600;
+  padding: 1px 8px; margin-top: 6px;
+  border-radius: 2px;
+  border: 1.5px solid; line-height: 1.5;
+  opacity: 0.8;
+}
+.stamp-in {
+  color: #67c23a; border-color: #67c23a;
+  background: rgba(103,194,58,0.06);
+}
+.stamp-out {
+  color: #909399; border-color: #909399;
+  background: rgba(144,147,153,0.06);
+}
+.stamp-pending {
+  color: #e6a23c; border-color: #e6a23c;
+  background: rgba(230,162,60,0.06);
+}
+.stamp-default {
+  color: #909399; border-color: #909399;
+  background: rgba(144,147,153,0.04);
+}
 
 /* ==================== 打印预览 ==================== */
 .print-area {
@@ -2534,6 +2570,7 @@ function onOutEditDialogOpened() {
   gap: 10px;
 }
 .label-print-item {
+  position: relative;
   display: flex;
   justify-content: center;
 }

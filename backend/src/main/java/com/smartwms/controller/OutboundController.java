@@ -2,6 +2,8 @@ package com.smartwms.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.smartwms.common.BusinessException;
+import com.smartwms.common.ErrorCode;
 import com.smartwms.common.Result;
 import com.smartwms.dto.ConfirmOutboundRequest;
 import com.smartwms.dto.OutboundHistoryVO;
@@ -99,7 +101,7 @@ public class OutboundController {
     }
 
     /**
-     * 修改出库单（仅"未出库"或"部分出库"状态可修改）。
+     * 修改出库单（仅"未完成"或"部分完成"状态可修改）。
      */
     @PutMapping("/orders/{id}")
     public Result<Void> update(@PathVariable Long id,
@@ -109,7 +111,7 @@ public class OutboundController {
     }
 
     /**
-     * 删除出库单（仅"未出库"状态可删除，已拣货的库存会退回）。
+     * 删除出库单（仅"未完成"状态可删除，已拣货的库存会退回）。
      */
     @DeleteMapping("/orders/{id}")
     public Result<Void> delete(@PathVariable Long id) {
@@ -134,14 +136,23 @@ public class OutboundController {
         if (barcode.startsWith("OUT|")) {
             return Result.success("扫码出库成功", outboundService.scanOutbound(barcode));
         }
-        // WMS 二维码：按状态分派。待出库→出库核销，其他→入库核销
-        Barcode bc = barcodeMapper.selectOne(
-                new LambdaQueryWrapper<Barcode>().eq(Barcode::getBarcode, barcode)
-        );
-        if (bc != null && "待出库".equals(bc.getStatus())) {
-            return Result.success("扫码出库成功", outboundService.scanOutbound(barcode));
+        if (barcode.startsWith("WMS|")) {
+            Barcode bc = barcodeMapper.selectOne(
+                    new LambdaQueryWrapper<Barcode>().eq(Barcode::getBarcode, barcode));
+            if (bc != null && "待出库".equals(bc.getStatus())) {
+                return Result.success("扫码出库成功", outboundService.scanOutbound(barcode));
+            }
+            if (bc != null && "在库".equals(bc.getStatus())) {
+                ScanInboundVO inboundResult = inboundService.scanReceive(request);
+                return Result.success("扫码入库成功", ScanResponse.inbound(inboundResult));
+            }
+            if (bc != null && "待入库".equals(bc.getStatus())) {
+                ScanInboundVO inboundResult = inboundService.scanReceive(request);
+                return Result.success("扫码入库成功", ScanResponse.inbound(inboundResult));
+            }
+            throw new BusinessException(ErrorCode.BAD_REQUEST,
+                "该二维码状态为「" + (bc != null ? bc.getStatus() : "未知") + "」，不可扫码操作");
         }
-        ScanInboundVO inboundResult = inboundService.scanReceive(request);
-        return Result.success("扫码入库成功", ScanResponse.inbound(inboundResult));
+        throw new BusinessException(ErrorCode.BAD_REQUEST, "无法识别的二维码格式");
     }
 }

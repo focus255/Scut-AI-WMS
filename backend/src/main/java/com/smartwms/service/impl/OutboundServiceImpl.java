@@ -25,10 +25,15 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Service
 public class OutboundServiceImpl implements OutboundService {
+
+    /** 出库单号每日序号 */
+    private static final AtomicInteger OUTBOUND_SEQ = new AtomicInteger(0);
+    private static volatile String lastOutboundDate = "";
 
     private final OutboundOrderMapper outboundOrderMapper;
     private final OutboundDetailMapper outboundDetailMapper;
@@ -93,10 +98,19 @@ public class OutboundServiceImpl implements OutboundService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public OutboundOrder create(OutboundOrderRequest request) {
-        String orderNo = "CK" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+        String datePart = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        if (!datePart.equals(lastOutboundDate)) {
+            synchronized (OutboundServiceImpl.class) {
+                if (!datePart.equals(lastOutboundDate)) {
+                    OUTBOUND_SEQ.set(0);
+                    lastOutboundDate = datePart;
+                }
+            }
+        }
+        String orderNo = "CK" + datePart + String.format("%05d", OUTBOUND_SEQ.incrementAndGet());
         OutboundOrder order = new OutboundOrder();
         order.setOrderNo(orderNo);
-        order.setStatus("未出库");
+        order.setStatus("未完成");
         outboundOrderMapper.insert(order);
 
         for (OutboundOrderRequest.OutboundDetailItem item : request.getDetails()) {
@@ -246,7 +260,7 @@ public class OutboundServiceImpl implements OutboundService {
         });
         boolean anyConfirmed = details.stream().anyMatch(detail ->
                 (detail.getActualQty() != null ? detail.getActualQty() : 0) > 0);
-        order.setStatus(allCompleted ? "已完成" : (anyConfirmed ? "部分出库" : "未出库"));
+        order.setStatus(allCompleted ? "已完成" : (anyConfirmed ? "部分完成" : "未完成"));
         outboundOrderMapper.updateById(order);
     }
 
@@ -351,7 +365,7 @@ public class OutboundServiceImpl implements OutboundService {
         }
 
         // 重置状态
-        order.setStatus("未出库");
+        order.setStatus("未完成");
         outboundOrderMapper.updateById(order);
     }
 
@@ -363,8 +377,8 @@ public class OutboundServiceImpl implements OutboundService {
     public void delete(Long id) {
         OutboundOrder order = outboundOrderMapper.selectById(id);
         if (order == null) throw new BusinessException(ErrorCode.NOT_FOUND, "出库单不存在");
-        if (!"未出库".equals(order.getStatus()))
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "仅未出库状态的出库单可删除");
+        if (!"未完成".equals(order.getStatus()))
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "仅未完成状态的出库单可删除");
 
         rollbackPick(id);
         outboundDetailMapper.delete(new LambdaQueryWrapper<OutboundDetail>()
@@ -554,6 +568,9 @@ public class OutboundServiceImpl implements OutboundService {
         if ("已出库".equals(inboundBc.getStatus())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "该二维码已出库，请勿重复扫码");
         }
+        if ("FROZEN".equals(inboundBc.getStatus())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "该二维码已被封存，不可出库。请先解封");
+        }
         if (!"待出库".equals(inboundBc.getStatus())) {
             if ("在库".equals(inboundBc.getStatus())) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST,
@@ -605,7 +622,7 @@ public class OutboundServiceImpl implements OutboundService {
             return act >= plan;
         });
         boolean anyConfirmed = allDetails.stream().anyMatch(d -> (d.getActualQty() != null ? d.getActualQty() : 0) > 0);
-        order.setStatus(allCompleted ? "已完成" : (anyConfirmed ? "部分出库" : "未出库"));
+        order.setStatus(allCompleted ? "已完成" : (anyConfirmed ? "部分完成" : "未完成"));
         outboundOrderMapper.updateById(order);
 
         return ScanResponse.outbound(order.getOrderNo(), materialCode, barcodeStr, boxQty);

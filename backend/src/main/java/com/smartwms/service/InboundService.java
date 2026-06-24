@@ -40,7 +40,7 @@ public interface InboundService {
     InboundOrderVO getById(Long id);
 
     /**
-     * 修改入库单（仅"未入库"状态可修改）。
+     * 修改入库单（仅"未完成"状态可修改）。
      */
     InboundOrder update(Long id, InboundOrderRequest request);
 
@@ -58,7 +58,7 @@ public interface InboundService {
     ScanInboundVO scanReceive(ScanInboundRequest request);
 
     /**
-     * 删除入库单（仅"未入库"状态可删除）。
+     * 删除入库单（仅"未完成"状态可删除）。
      */
     void delete(Long id);
 
