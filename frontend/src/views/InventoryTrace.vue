@@ -11,8 +11,11 @@
         <span class="toolbar-tip">按物料号、看板号或入库单号查询二维码生命周期轨迹</span>
       </div>
       <div class="toolbar">
-        <el-input v-model="query.materialCode" placeholder="物料号" clearable size="small"
-          style="width: 160px" @keyup.enter="doQuery" />
+        <el-select v-model="query.materialCode" placeholder="选择物料号" filterable clearable
+          size="small" style="width: 180px" :filter-method="filterMaterial">
+          <el-option v-for="m in materialOptions" :key="m.materialCode"
+            :label="m.materialCode + ' ' + m.materialName" :value="m.materialCode" />
+        </el-select>
         <el-input v-model="query.barcode" placeholder="看板号（模糊）" clearable size="small"
           style="width: 200px" @keyup.enter="doQuery" />
         <el-input v-model="query.orderNo" placeholder="入库单号（模糊）" clearable size="small"
@@ -85,12 +88,15 @@
 /**
  * 库存与看板监控 — 联查二维码与入库明细，展示完整生命周期。
  */
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getInventoryTrace } from '@/api/inbound'
+import { getMaterials } from '@/api/materials'
 import { exportCSV } from '@/utils/export'
 import QRCode from '@/components/QRCode.vue'
 
+const allMaterials = ref([])
+const materialOptions = ref([])
 const loading = ref(false)
 const traceData = ref([])
 const selectedRows = ref([])
@@ -112,6 +118,22 @@ const statusStats = computed(() => {
   })
   return s
 })
+
+onMounted(async () => {
+  try {
+    const data = await getMaterials({ page: 1, size: 100 })
+    allMaterials.value = data.records || []
+    materialOptions.value = [...allMaterials.value]
+  } catch { /* */ }
+})
+
+function filterMaterial(query) {
+  if (!query) { materialOptions.value = [...allMaterials.value]; return }
+  const q = query.toLowerCase()
+  materialOptions.value = allMaterials.value.filter(m =>
+    m.materialCode.toLowerCase().includes(q) ||
+    (m.materialName && m.materialName.toLowerCase().includes(q)))
+}
 
 async function doQuery() {
   const hasMaterial = query.materialCode.trim()

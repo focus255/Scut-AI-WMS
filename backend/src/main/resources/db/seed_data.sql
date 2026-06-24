@@ -446,47 +446,47 @@ VALUES
 INSERT IGNORE INTO ai_inventory_reports
     (material_code, current_stock, risk_type, risk_level,
      analysis_content, replenishment_suggestion, suggested_qty,
-     prediction_status, confidence, created_at) VALUES
+     prediction_status, created_at) VALUES
 
 ('M_PART_008', 510, 'DEAD_STOCK', 'MEDIUM',
  '燃油泵模块当前库存高达510件，DOHF约64天，远超控制上限15天。近30日均消耗仅8件/天，资金占用严重。',
  '建议立即暂停采购，优先消耗现有库存。可与供应商协商退货或调拨。',
- 0, 'SUCCESS', 0.88, DATE_SUB(NOW(), INTERVAL 2 HOUR)),
+ 0, 'SUCCESS', DATE_SUB(NOW(), INTERVAL 2 HOUR)),
 
 ('M_PART_005', 30, 'LOW_STOCK', 'CRITICAL',
  '刹车片组件库存仅30件，已严重跌破补货预警线（10件/天×5天+50件=100件）。库存仅可维持3天，面临停产风险。',
  '建议立即向供应商发起紧急补货200件。',
- 200, 'SUCCESS', 0.95, DATE_SUB(NOW(), INTERVAL 3 HOUR)),
+ 200, 'SUCCESS', DATE_SUB(NOW(), INTERVAL 3 HOUR)),
 
 ('M_PART_012', 20, 'BOTH', 'CRITICAL',
  'ESP模块库存仅剩20件（预警线=8件/天×5天+40件=80件），库存仅可维持2.5天。',
  '建议紧急补货150件，同时确认排产计划避免补货后形成积压。',
- 150, 'SUCCESS', 0.91, DATE_SUB(NOW(), INTERVAL 1 HOUR)),
+ 150, 'SUCCESS', DATE_SUB(NOW(), INTERVAL 1 HOUR)),
 
 ('M_PART_004', 50, 'LOW_STOCK', 'HIGH',
- '[降级引擎Mock提示]: ECU当前库存50件，已跌破补货预警线（10件/天×7天+50件=120件）。',
- '建议紧急补货120件至预警线以上。',
- 120, 'MOCKED', 0.60, DATE_SUB(NOW(), INTERVAL 30 MINUTE)),
+ '发动机控制单元ECU当前库存50件，已跌破补货预警线（10件/天×7天+50件=120件），面临断供风险。',
+ '建议紧急补货120件至预警线以上，并同步检查供应商生产排期。',
+ 120, 'SUCCESS', DATE_SUB(NOW(), INTERVAL 30 MINUTE)),
 
 ('M_PART_001', 200, 'NORMAL', 'LOW',
  '左前大灯总成库存200件，预警线100件，安全边际充足。DOHF约20天（上限25），健康度良好。',
  '维持当前采购节奏，按周例行检查。',
- 0, 'SUCCESS', 0.97, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+ 0, 'SUCCESS', DATE_SUB(NOW(), INTERVAL 1 DAY)),
 
 ('M_PART_015', 35, 'NORMAL', 'LOW',
  '分析中...',
  '分析中...',
- 0, 'PENDING', 0.00, DATE_SUB(NOW(), INTERVAL 5 MINUTE)),
+ 0, 'PENDING', DATE_SUB(NOW(), INTERVAL 5 MINUTE)),
 
 ('M_PART_009', 80, 'DEAD_STOCK', 'HIGH',
  '氧传感器库存80件，已连续120天无出库。该物料属上代专用件，需求萎缩，存在过期报废风险。',
  '建议确认后续车型使用计划，若无则启动报废或折价处理。',
- 0, 'SUCCESS', 0.85, DATE_SUB(NOW(), INTERVAL 2 DAY)),
+ 0, 'SUCCESS', DATE_SUB(NOW(), INTERVAL 2 DAY)),
 
 ('M_PART_011', 240, 'DEAD_STOCK', 'MEDIUM',
- '[降级引擎Mock提示]: 雨刮电机库存240件，连续95天无出库，判定为呆滞物料。',
- '建议暂缓采购，启动库存消化计划。',
- 0, 'MOCKED', 0.60, DATE_SUB(NOW(), INTERVAL 1 DAY));
+ '雨刮电机库存240件，连续95天无出库记录，远超90天呆滞判定阈值，建议立即启动库存消化计划。',
+ '建议暂缓采购，优先消耗现有库存，可考虑与供应商协商退货或调拨。',
+ 0, 'SUCCESS', DATE_SUB(NOW(), INTERVAL 1 DAY));
 
 
 -- ==================== 10. 封存/解封记录 ====================

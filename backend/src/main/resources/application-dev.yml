@@ -1,5 +1,7 @@
 # ===================================================================
 # 开发环境 — MySQL 持久化数据库
+# ⚠️ 此文件由 git 追踪，严禁写入真实 API Key / 密码
+# ⚠️ 本地敏感配置请写入 application-local.yml（已在 .gitignore 排除）
 # 首次启动前需先执行: mysql -u root -p < seed_data.sql
 # @author Focus
 # @date 2026-06-24

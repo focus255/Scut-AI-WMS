@@ -1,0 +1,21 @@
+# ===================================================================
+# 本地开发配置模板
+# 使用方法：复制为 application-local.yml，填入真实配置
+#   cp application-local.yml.example application-local.yml
+#
+# ⚠️  application-local.yml 已在 .gitignore 中排除，不会被提交到 git
+# ⚠️  严禁将真实 API Key 写入 application.yml / application-dev.yml
+# ===================================================================
+
+# ---- 覆盖 AI 大模型配置（使用真实 Key） ----
+ai:
+  llm:
+    api-key: 在此填入你的真实 API Key
+    base-url: https://api.deepseek.com/v1
+    model: deepseek-chat
+
+# ---- 覆盖数据库配置（可选） ----
+# spring:
+#   datasource:
+#     username: root
+#     password: your-local-password

@@ -757,7 +757,7 @@ public class DataInitializer implements CommandLineRunner {
         LocalDateTime now = LocalDateTime.now();
 
         // 1. 高储物料 M_PART_008 → AI 诊断为滞销风险（库存510件，DOHF≈64天，上限15天）
-        insertAiReport("M_PART_008", 510, "DEAD_STOCK", "MEDIUM", "SUCCESS", 0, 0.88f,
+        insertAiReport("M_PART_008", 510, "DEAD_STOCK", "MEDIUM", "SUCCESS", 0,
                 "燃油泵模块当前库存高达510件（34个整箱），DOHF约64天，远超控制上限15天。" +
                 "近30日均消耗仅8件/天，现有库存可维持64天，资金占用严重。" +
                 "结合未来需求预测，短期内无大规模消耗计划，存在明确的呆滞积压风险。",
@@ -766,7 +766,7 @@ public class DataInitializer implements CommandLineRunner {
                 now.minusHours(2));
 
         // 2. 严重低储 M_PART_005 → AI 建议紧急补货（库存30件，预警线100件）
-        insertAiReport("M_PART_005", 30, "LOW_STOCK", "CRITICAL", "SUCCESS", 200, 0.95f,
+        insertAiReport("M_PART_005", 30, "LOW_STOCK", "CRITICAL", "SUCCESS", 200,
                 "刹车片组件当前库存仅30件，已严重跌破补货预警线（10件/天×5天+50件=100件）。" +
                 "按当前日均消耗10件计算，库存仅可维持3天，面临总装线停产风险。属于最高优先级断供预警。" +
                 "此外该物料还有1箱因质量问题被封存（10天前），进一步加剧了可用库存紧张。",
@@ -775,7 +775,7 @@ public class DataInitializer implements CommandLineRunner {
                 now.minusHours(3));
 
         // 3. ESP模块 M_PART_012 → AI 双重风险（极端低储+潜在呆滞，库存20件，预警线80件）
-        insertAiReport("M_PART_012", 20, "BOTH", "CRITICAL", "SUCCESS", 150, 0.91f,
+        insertAiReport("M_PART_012", 20, "BOTH", "CRITICAL", "SUCCESS", 150,
                 "ESP车身稳定模块库存仅剩20件，已触发极端低储警报（预警线=8件/天×5天+40件=80件）。" +
                 "按日均消耗8件计算，库存仅可维持2.5天。同时该物料近5天无出库记录，需关注需求波动风险。",
                 "建议紧急补货150件至基础安全线以上。同时与计划部门确认未来两周排产计划，" +
@@ -783,7 +783,7 @@ public class DataInitializer implements CommandLineRunner {
                 now.minusHours(1));
 
         // 4. Mock 兜底报告 — M_PART_004 低储（库存50件，预警线120件）
-        insertAiReport("M_PART_004", 50, "LOW_STOCK", "HIGH", "MOCKED", 120, 0.6f,
+        insertAiReport("M_PART_004", 50, "LOW_STOCK", "HIGH", "MOCKED", 120,
                 "[降级引擎Mock提示]: 由于外部AI推演大模型服务连线超时，系统自动执行基本精益规则扫描。" +
                 "发动机控制单元ECU当前库存50件，已跌破补货预警线（10件/天×7天+50件=120件）。" +
                 "库存仅可维持约5天，存在断供风险。",
@@ -791,7 +791,7 @@ public class DataInitializer implements CommandLineRunner {
                 now.minusMinutes(30));
 
         // 5. 正常物料 M_PART_001 → AI 确认无风险（库存200件，预警线100件，DOHF=20天）
-        insertAiReport("M_PART_001", 200, "NORMAL", "LOW", "SUCCESS", 0, 0.97f,
+        insertAiReport("M_PART_001", 200, "NORMAL", "LOW", "SUCCESS", 0,
                 "左前大灯总成当前库存200件（10个整箱），处于安全水位区间。" +
                 "补货预警线100件（10件/天×5天+50件），实际库存200件，安全边际充足。" +
                 "近30日出库稳定，日均消耗约10件，DOHF约20天（上限20天），库存健康度良好，无需干预。",
@@ -799,11 +799,11 @@ public class DataInitializer implements CommandLineRunner {
                 now.minusDays(1));
 
         // 6. PENDING 状态报告 — M_PART_015（模拟正在等待 AI 分析）
-        insertAiReport("M_PART_015", 35, "NORMAL", "LOW", "PENDING", 0, 0f,
+        insertAiReport("M_PART_015", 35, "NORMAL", "LOW", "PENDING", 0,
                 "分析中...", "分析中...", now.minusMinutes(5));
 
         // 7. 呆滞物料 M_PART_009 → AI 诊断为呆滞风险（闲置120天，库存80件）
-        insertAiReport("M_PART_009", 80, "DEAD_STOCK", "HIGH", "SUCCESS", 0, 0.85f,
+        insertAiReport("M_PART_009", 80, "DEAD_STOCK", "HIGH", "SUCCESS", 0,
                 "氧传感器当前库存80件，已连续120天无出库记录，远超90天呆滞判定阈值。" +
                 "该物料属于上一代发动机平台专用件，随着车型换代需求急剧萎缩。" +
                 "当前库存按历史日均3件计算，DOHF约27天，但由于无实际需求，存在过期报废风险。",
@@ -812,7 +812,7 @@ public class DataInitializer implements CommandLineRunner {
                 now.minusDays(2));
 
         // 8. 呆滞物料 M_PART_011 → AI 诊断（闲置95天，库存240件）
-        insertAiReport("M_PART_011", 240, "DEAD_STOCK", "MEDIUM", "MOCKED", 0, 0.6f,
+        insertAiReport("M_PART_011", 240, "DEAD_STOCK", "MEDIUM", "MOCKED", 0,
                 "[降级引擎Mock提示]: 雨刮电机当前库存240件，已连续95天无出库记录，判定为呆滞物料。" +
                 "建议暂停采购并优先消耗现有库存。",
                 "建议暂缓采购，启动库存消化计划。可考虑与供应商协商调拨或退货。",
@@ -821,7 +821,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private void insertAiReport(String materialCode, int stock, String riskType,
                                 String riskLevel, String status, int suggestedQty,
-                                float confidence, String analysis, String suggestion,
+                                String analysis, String suggestion,
                                 LocalDateTime createdAt) {
         AiReport report = new AiReport();
         report.setMaterialCode(materialCode);
@@ -830,7 +830,6 @@ public class DataInitializer implements CommandLineRunner {
         report.setRiskLevel(riskLevel);
         report.setPredictionStatus(status);
         report.setSuggestedQty(suggestedQty);
-        report.setConfidence(confidence);
         report.setAnalysisContent(analysis);
         report.setReplenishmentSuggestion(suggestion);
         report.setCreatedAt(createdAt);

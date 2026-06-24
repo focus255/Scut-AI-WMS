@@ -185,8 +185,8 @@ CREATE TABLE IF NOT EXISTS `ai_inventory_reports` (
   `analysis_content`         TEXT NOT NULL COMMENT 'AI生成的核心库存演进与根因剖析大段文字',
   `replenishment_suggestion` TEXT NOT NULL COMMENT 'AI给出的物料精益补货控制行动计划描述',
   `suggested_qty`            INT DEFAULT 0 COMMENT 'AI给出的量化推荐补货量(件)',
-  `prediction_status`        VARCHAR(50) NOT NULL DEFAULT 'PENDING' COMMENT '异步诊断进度: PENDING / RUNNING / SUCCESS / MOCKED',
-  `confidence`               FLOAT DEFAULT 1.0 COMMENT '模型输出可信度得分',
+  `prediction_status`        VARCHAR(50) NOT NULL DEFAULT 'PENDING' COMMENT '诊断状态: PENDING / RUNNING / SUCCESS / FAILED',
+  `model`                    VARCHAR(100) DEFAULT '' COMMENT '生成报告的模型名称',
   `created_at`               DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at`               DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );

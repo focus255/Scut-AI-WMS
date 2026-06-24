@@ -8,10 +8,18 @@
     <!-- 查询栏 -->
     <div class="content-block" style="margin-bottom: 16px">
       <div class="toolbar" style="margin-bottom: 0">
-        <el-input v-model="queryCode" placeholder="输入物料号查询最新 AI 报告" clearable
-          size="small" style="width: 300px" @keyup.enter="handleQuery" />
-        <el-button type="primary" size="small" :loading="queryLoading" @click="handleQuery">
+        <el-select v-model="queryCode" placeholder="选择或搜索物料号" filterable clearable
+          size="small" style="width: 300px" :filter-method="filterMaterial" @change="handleQuery">
+          <el-option v-for="m in materialOptions" :key="m.materialCode"
+            :label="m.materialCode + ' — ' + m.materialName" :value="m.materialCode" />
+        </el-select>
+        <el-button type="primary" size="small" :loading="queryLoading"
+          style="min-width: 90px" @click="handleQuery">
           查询报告
+        </el-button>
+        <el-button size="small" :disabled="!queryCode.trim()" :loading="regenerating"
+          style="min-width: 90px" @click="handleRegenerate">
+          重新生成
         </el-button>
       </div>
     </div>
@@ -43,8 +51,8 @@
             <span class="info-value">{{ report.createdAt }}</span>
           </div>
           <div class="info-item">
-            <span class="info-label">置信度</span>
-            <span class="info-value">{{ (report.confidence * 100).toFixed(0) }}%</span>
+            <span class="info-label">诊断模型</span>
+            <span class="info-value">{{ report.model || '—' }}</span>
           </div>
         </div>
       </div>
@@ -108,17 +116,42 @@
 /**
  * AI 报告详页。
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getLatestReport, triggerPredict } from '@/api/ai'
+import { getMaterials } from '@/api/materials'
 
 const router = useRouter()
 
+const allMaterials = ref([])
+const materialOptions = ref([])
 const queryCode = ref('')
 const queryLoading = ref(false)
+const regenerating = ref(false)
 const report = ref(null)
 const queried = ref(false)
+
+onMounted(async () => {
+  try {
+    const data = await getMaterials({ page: 1, size: 100 })
+    allMaterials.value = data.records || []
+    materialOptions.value = [...allMaterials.value]
+  } catch { /* */ }
+})
+
+/** el-select 自定义过滤：按物料号或名称匹配 */
+function filterMaterial(query) {
+  if (!query) {
+    materialOptions.value = [...allMaterials.value]
+    return
+  }
+  const q = query.toLowerCase()
+  materialOptions.value = allMaterials.value.filter(m =>
+    m.materialCode.toLowerCase().includes(q) ||
+    (m.materialName && m.materialName.toLowerCase().includes(q))
+  )
+}
 
 const showConvert = computed(() => {
   if (!report.value) return false
@@ -130,14 +163,36 @@ async function handleQuery() {
   if (!queryCode.value.trim()) return
   queryLoading.value = true
   queried.value = true
+  const code = queryCode.value.trim()
   try {
-    report.value = await getLatestReport(queryCode.value.trim())
+    report.value = await getLatestReport(code)
   } catch {
     report.value = null
-    ElMessage.error('查询AI报告失败')
-  } finally {
-    queryLoading.value = false
   }
+
+  // 报告不存在或失败 → 自动生成
+  if (!report.value || report.value.predictionStatus === 'FAILED') {
+    report.value = null
+    ElMessage.info('正在生成报告，请稍候...')
+    try { await triggerPredict(code) } catch { /* 忽略 */ }
+
+    // 轮询等待生成完成，最多等 20 秒
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 2000))
+      try {
+        const r = await getLatestReport(code)
+        if (r && (r.predictionStatus === 'SUCCESS')) {
+          report.value = r
+          ElMessage.success('报告生成完成')
+          break
+        }
+      } catch { /* 继续等待 */ }
+    }
+    if (!report.value) {
+      ElMessage.warning('报告生成超时，请稍后手动刷新')
+    }
+  }
+  queryLoading.value = false
 }
 
 async function handleTrigger() {
@@ -146,6 +201,21 @@ async function handleTrigger() {
     ElMessage.success('AI 预测任务已启动，请稍后刷新查看')
   } catch {
     ElMessage.error('启动失败')
+  }
+}
+
+async function handleRegenerate() {
+  if (!queryCode.value.trim()) return
+  regenerating.value = true
+  try {
+    await triggerPredict(queryCode.value.trim())
+    ElMessage.success('已提交重新生成，请等待几秒后查询')
+    // 等3秒后自动查询
+    setTimeout(() => handleQuery(), 4000)
+  } catch (err) {
+    ElMessage.error(err?.message || '重新生成失败')
+  } finally {
+    regenerating.value = false
   }
 }
 
@@ -159,11 +229,11 @@ function handleConvert() {
 
 // ---- 标签 ----
 function statusBadge(s) {
-  const m = { 'PENDING': 'default', 'RUNNING': 'warn', 'SUCCESS': 'success', 'MOCKED': 'warn' }
+  const m = { 'PENDING': 'default', 'RUNNING': 'warn', 'SUCCESS': 'success', 'FAILED': 'danger', 'MOCKED': 'warn' }
   return m[s] || 'default'
 }
 function statusLabel(s) {
-  const m = { 'PENDING': '等待分析', 'RUNNING': '分析中', 'SUCCESS': '分析完成', 'MOCKED': '降级报告' }
+  const m = { 'PENDING': '等待分析', 'RUNNING': '分析中', 'SUCCESS': '分析完成', 'FAILED': '分析失败', 'MOCKED': '降级报告' }
   return m[s] || s
 }
 function riskBadge(r) {
@@ -177,6 +247,10 @@ function riskLabel(r) {
 function levelBadge(l) {
   const m = { 'CRITICAL': 'danger', 'HIGH': 'warn', 'MEDIUM': 'default', 'LOW': 'success' }
   return m[l] || 'default'
+}
+function sourceLabel(s) {
+  const m = { 'SUCCESS': 'AI 大模型', 'FAILED': '调用失败', 'MOCKED': '本地规则引擎', 'PENDING': '等待分析', 'RUNNING': '分析中' }
+  return m[s] || s
 }
 </script>
 

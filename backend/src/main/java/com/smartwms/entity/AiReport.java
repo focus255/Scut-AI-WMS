@@ -36,11 +36,11 @@ public class AiReport {
     /** AI 给出的量化推荐补货量（件） */
     private Integer suggestedQty;
 
-    /** 异步诊断进度：PENDING / RUNNING / SUCCESS / MOCKED */
+    /** 诊断状态：PENDING / RUNNING / SUCCESS / FAILED */
     private String predictionStatus;
 
-    /** 模型输出可信度得分 */
-    private Float confidence;
+    /** 生成报告的模型名称（如 deepseek-v4-flash） */
+    private String model;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
@@ -77,8 +77,8 @@ public class AiReport {
     public String getPredictionStatus() { return predictionStatus; }
     public void setPredictionStatus(String predictionStatus) { this.predictionStatus = predictionStatus; }
 
-    public Float getConfidence() { return confidence; }
-    public void setConfidence(Float confidence) { this.confidence = confidence; }
+    public String getModel() { return model; }
+    public void setModel(String model) { this.model = model; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

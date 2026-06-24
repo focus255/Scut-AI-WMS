@@ -40,7 +40,6 @@ public class RuleMockEngine {
         report.setMaterialCode(materialCode);
         report.setCurrentStock(inventory.getStockQty());
         report.setPredictionStatus("MOCKED");
-        report.setConfidence(0.6f);
 
         int currentStock = inventory.getStockQty() != null ? inventory.getStockQty() : 0;
         int minStockDays = inventory.getMinStockDays() != null ? inventory.getMinStockDays() : 3;
@@ -51,36 +50,25 @@ public class RuleMockEngine {
         // 补货预警线 = (日均销量 × 补货提前期) + 安全库存
         double lowThreshold = (dailyConsume * leadTimeDays) + safetyStock;
 
-        // 优先级1：库存为零
+        // 优先级判定
         if (currentStock <= 0) {
             buildZeroStockReport(report, currentStock, dailyConsume, lowThreshold);
-            return report;
-        }
-
-        // 优先级2：呆滞检测 — 超过90天无出库
-        if (idleDays >= DEAD_STOCK_DAYS) {
+        } else if (idleDays >= DEAD_STOCK_DAYS) {
             buildDeadStockReport(report, currentStock, idleDays, dailyConsume, maxStockDays);
-            return report;
-        }
-
-        // 优先级3：低储检测
-        if (dailyConsume > 0 && currentStock < lowThreshold) {
+        } else if (dailyConsume > 0 && currentStock < lowThreshold) {
             buildLowStockReport(report, currentStock, dailyConsume, futureDemand,
                     lowThreshold, minStockDays, leadTimeDays, safetyStock);
-            return report;
-        }
-
-        // 优先级4：高储检测 — DOHF 超标
-        if (dailyConsume > 0) {
+        } else if (dailyConsume > 0) {
             double dohf = currentStock / dailyConsume;
             if (dohf > maxStockDays) {
                 buildHighStockReport(report, currentStock, dailyConsume, dohf, maxStockDays);
-                return report;
+            } else {
+                buildNormalReport(report, currentStock, dailyConsume, lowThreshold, maxStockDays);
             }
+        } else {
+            buildNormalReport(report, currentStock, dailyConsume, lowThreshold, maxStockDays);
         }
 
-        // 优先级5：正常水位
-        buildNormalReport(report, currentStock, dailyConsume, lowThreshold, maxStockDays);
         return report;
     }
 
