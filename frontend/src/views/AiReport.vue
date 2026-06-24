@@ -134,6 +134,7 @@ async function handleQuery() {
     report.value = await getLatestReport(queryCode.value.trim())
   } catch {
     report.value = null
+    ElMessage.error('查询AI报告失败')
   } finally {
     queryLoading.value = false
   }

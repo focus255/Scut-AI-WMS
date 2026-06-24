@@ -131,6 +131,7 @@ async function doQuery() {
     traceData.value = data.items || []
   } catch {
     traceData.value = []
+    ElMessage.error('追溯查询失败')
   } finally {
     loading.value = false
   }

@@ -106,7 +106,7 @@ async function loadReport() {
   try {
     const data = await getStockReport({ materialCode: filterCode.value || undefined, alarmStatus: filterStatus.value || undefined })
     reportData.value = data || []
-  } catch { /* */ } finally { loading.value = false }
+  } catch { ElMessage.error('加载报表失败') } finally { loading.value = false }
 }
 
 async function handlePredict(row) {

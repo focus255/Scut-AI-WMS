@@ -167,8 +167,10 @@ async function loadList() {
     const data = await request.get('/freeze/list', { params })
     freezeList.value = data.records || []
     total.value = data.total || 0
-  } catch { freezeList.value = [] }
-  finally { loading.value = false }
+  } catch {
+    freezeList.value = []
+    ElMessage.error('加载封存列表失败')
+  } finally { loading.value = false }
 }
 
 function openSealDialog() {
@@ -233,7 +235,9 @@ async function handleEditUnseal() {
     ElMessage.success('解封成功')
     editVisible.value = false
     loadList()
-  } catch { /* */ }
+  } catch (err) {
+    if (err !== 'cancel' && err?.message) ElMessage.error(err.message)
+  }
 }
 
 async function handleUnseal(row) {
@@ -242,7 +246,9 @@ async function handleUnseal(row) {
     await request.post('/freeze/unseal', null, { params: { barcode: row.barcode } })
     ElMessage.success('解封成功')
     loadList()
-  } catch { /* 取消或失败 */ }
+  } catch (err) {
+    if (err !== 'cancel' && err?.message) ElMessage.error(err.message)
+  }
 }
 </script>
 

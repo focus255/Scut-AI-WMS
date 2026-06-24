@@ -325,7 +325,9 @@ async function loadMaterials(page = 1) {
     const data = await getMaterials({ page, size: 10, keyword: materialKeyword.value })
     materialList.value = data.records || []
     materialTotal.value = data.total || 0
-  } catch { /* */ } finally {
+  } catch {
+    ElMessage.error('加载物料失败')
+  } finally {
     materialLoading.value = false
   }
 }
@@ -353,7 +355,9 @@ async function handleMaterialSave() {
     }
     materialDialogVisible.value = false
     loadMaterials(materialPage.value)
-  } catch { /* */ }
+  } catch (err) {
+    ElMessage.error(err?.message || '保存物料失败')
+  }
 }
 
 function handleMaterialDelete(row) {
@@ -369,7 +373,9 @@ async function confirmMaterialDelete() {
     materialDeleteVisible.value = false
     materialDeleteTarget.value = null
     loadMaterials(materialPage.value)
-  } catch { /* */ }
+  } catch (err) {
+    ElMessage.error(err?.message || '删除物料失败')
+  }
 }
 
 // ==================== 供应商 CRUD ====================
@@ -380,7 +386,9 @@ async function loadSuppliers(page = 1) {
     const data = await getSuppliers({ page, size: 10, keyword: supplierKeyword.value })
     supplierList.value = data.records || []
     supplierTotal.value = data.total || 0
-  } catch { /* */ } finally {
+  } catch {
+    ElMessage.error('加载供应商失败')
+  } finally {
     supplierLoading.value = false
   }
 }
@@ -413,7 +421,9 @@ async function handleSupplierSave() {
     }
     supplierDialogVisible.value = false
     loadSuppliers(supplierPage.value)
-  } catch { /* */ }
+  } catch (err) {
+    ElMessage.error(err?.message || '保存供应商失败')
+  }
 }
 
 function handleSupplierDelete(row) {
@@ -429,7 +439,9 @@ async function confirmSupplierDelete() {
     supplierDeleteVisible.value = false
     supplierDeleteTarget.value = null
     loadSuppliers(supplierPage.value)
-  } catch { /* */ }
+  } catch (err) {
+    ElMessage.error(err?.message || '删除供应商失败')
+  }
 }
 
 // ==================== 器具 CRUD ====================
@@ -440,7 +452,9 @@ async function loadAppliances(page = 1) {
     const data = await getAppliances({ page, size: 10, keyword: applianceKeyword.value })
     applianceList.value = data.records || []
     applianceTotal.value = data.total || 0
-  } catch { /* */ } finally {
+  } catch {
+    ElMessage.error('加载器具数据失败')
+  } finally {
     applianceLoading.value = false
   }
 }
@@ -473,7 +487,9 @@ async function handleApplianceSave() {
     }
     applianceDialogVisible.value = false
     loadAppliances(appliancePage.value)
-  } catch { /* */ }
+  } catch (err) {
+    ElMessage.error(err?.message || '保存器具失败')
+  }
 }
 
 function handleApplianceDelete(row) {
@@ -489,7 +505,9 @@ async function confirmApplianceDelete() {
     applianceDeleteVisible.value = false
     applianceDeleteTarget.value = null
     loadAppliances(appliancePage.value)
-  } catch { /* */ }
+  } catch (err) {
+    ElMessage.error(err?.message || '删除器具失败')
+  }
 }
 
 // ==================== 导出 ====================

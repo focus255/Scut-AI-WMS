@@ -120,8 +120,10 @@ async function loadInboundHistory() {
     inboundTotal.value = data.total || 0
     inboundSummary.totalBatches = inboundTotal.value
     inboundSummary.totalQty = (data.records || []).reduce((s, r) => s + (r.actualQty || 0), 0)
-  } catch { inboundList.value = [] }
-  finally { inboundLoading.value = false }
+  } catch {
+    inboundList.value = []
+    ElMessage.error('加载入库历史失败')
+  } finally { inboundLoading.value = false }
 }
 
 // ========== 出库历史 ==========
@@ -152,8 +154,10 @@ async function loadOutboundHistory() {
     outboundTotal.value = data.total || 0
     outboundSummary.totalBatches = outboundTotal.value
     outboundSummary.totalQty = (data.records || []).reduce((s, r) => s + (r.actualQty || 0), 0)
-  } catch { outboundList.value = [] }
-  finally { outboundLoading.value = false }
+  } catch {
+    outboundList.value = []
+    ElMessage.error('加载出库历史失败')
+  } finally { outboundLoading.value = false }
 }
 
 function onTabChange(tab) {
