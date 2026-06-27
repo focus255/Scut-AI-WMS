@@ -70,6 +70,7 @@ public class DemandForecastService {
         String analysis = "";
         String model = "";
 
+        boolean aiSuccess = false;
         if (aiService.isConfigured()) {
             JsonNode result = aiService.chat(
                 "你是供应链需求预测专家。根据出入库历史数据预测未来4周。只返回JSON。",
@@ -85,13 +86,16 @@ public class DemandForecastService {
                 inPred[3] = result.path("inWeek4").asInt(inPred[0]);
                 analysis = result.path("analysis").asText("");
                 model = aiService.getModelName();
+                aiSuccess = true;
             }
-        } else {
+        }
+        // AI 未配置或 AI 返回 null 时，使用本地统计回退
+        if (!aiSuccess) {
             double outAvg = Arrays.stream(outWeeks).average().orElse(0);
             double inAvg = inWeeks.length > 0 ? Arrays.stream(inWeeks).average().orElse(0) : outAvg;
             for (int i = 0; i < PREDICT_WEEKS; i++) { outPred[i] = (int) Math.round(outAvg); inPred[i] = (int) Math.round(inAvg); }
             analysis = buildLocalAnalysis(outWeeks, trend, volatility, anomaly);
-            model = "本地统计";
+            model = "本地统计" + (aiService.isConfigured() ? "（AI回退）" : "");
         }
 
         // 4. 存储

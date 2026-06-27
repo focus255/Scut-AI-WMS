@@ -77,7 +77,7 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { getStockReport } from '@/api/stock'
-import { getDemandForecasts, generateAllDemandForecasts } from '@/api/demand'
+import { getDemandForecasts, generateAllDemandForecasts, regenerateDemandForecast } from '@/api/demand'
 import { getInboundOrders } from '@/api/inbound'
 import { getOutboundOrders } from '@/api/outbound'
 import { ElMessage, ElNotification } from 'element-plus'
@@ -284,12 +284,34 @@ function isValidMaterialCode(code) {
   return /^[A-Z0-9]+_/.test(code)
 }
 
+/** 检测该预测记录是否内容为空（AI 生成失败回退标识） */
+function isPredictionEmpty(d) {
+  return (!d.week1 && !d.week2 && !d.week3 && !d.week4) || !d.analysis
+}
+
+/** 检测是否为零历史物料（12 周出库全为零） */
+function isZeroHistory(d) {
+  return !parseHistory(d.weeklyHistory).some(v => v > 0)
+}
+
 async function loadDemand() {
   demandLoading.value = true
   try {
     const raw = await getDemandForecasts() || []
-    // 过滤：只保留合法物料号且 12 周历史不全为零的记录
-    demandData.value = raw.filter(d => isValidMaterialCode(d.materialCode) && parseHistory(d.weeklyHistory).some(v => v > 0))
+    // 排除无效物料号，保留所有合法物料（含零历史）
+    demandData.value = raw.filter(d => isValidMaterialCode(d.materialCode))
+    // 检测到有历史数据但 AI 预测失败（非零历史 + 预测为空）
+    const failedItems = demandData.value.filter(d => isPredictionEmpty(d) && !isZeroHistory(d))
+    if (failedItems.length > 0) {
+      const names = failedItems.map(d => d.materialCode).join(', ')
+      ElMessage.warning(`检测到 ${failedItems.length} 条预测异常 (${names})，正在重新生成...`)
+      await Promise.all(failedItems.map(d =>
+        regenerateDemandForecast(d.materialCode).catch(() => {})
+      ))
+      // 重新加载以获取更新后的数据
+      const refreshed = await getDemandForecasts() || []
+      demandData.value = refreshed.filter(d => isValidMaterialCode(d.materialCode))
+    }
   } catch { /* */ }
   finally { demandLoading.value = false }
 }
@@ -327,6 +349,12 @@ function renderDemandCharts() {
     const outHist = parseHistory(d.weeklyHistory)
     const inHist = parseHistory(d.inboundHistory)
     if (outHist.length === 0) return
+
+    // 零历史物料：不渲染空图表，显示占位提示文字
+    if (isZeroHistory(d)) {
+      el.innerHTML = '<div style="height:200px;display:flex;align-items:center;justify-content:center;color:#909399;font-size:13px;flex-direction:column;gap:4px"><span>无历史消耗数据</span><span style="font-size:11px">该物料近12周出库量为零</span></div>'
+      return
+    }
 
     const outFull = [...outHist, d.week1, d.week2, d.week3, d.week4]
     const inFull = inHist.length > 0
