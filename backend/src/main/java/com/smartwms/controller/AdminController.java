@@ -238,4 +238,34 @@ public class AdminController {
             badBarcodeCount, badInOrderCount, badOutOrderCount, delBarcodes, delInOrders, delOutOrders);
         return Result.success(result);
     }
+
+    /**
+     * 标准化看板号第7段（箱序号）：移除前导零。
+     * PUT /api/admin/normalize-barcodes
+     */
+    @PutMapping("/normalize-barcodes")
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Map<String, Object>> normalizeBarcodes() {
+        List<Barcode> allBarcodes = barcodeMapper.selectList(null);
+        int fixed = 0;
+        for (Barcode bc : allBarcodes) {
+            String b = bc.getBarcode();
+            if (b == null || !b.startsWith("WMS|")) continue;
+            String[] parts = b.split("\\|");
+            if (parts.length != 7) continue;
+            String boxSeq = parts[6];
+            // 纯数字且长度>1且有前导零的才需要修复
+            if (boxSeq.matches("0[0-9]+")) {
+                String normalized = boxSeq.replaceFirst("^0+", "");
+                parts[6] = normalized;
+                String newBarcode = String.join("|", parts);
+                bc.setBarcode(newBarcode);
+                barcodeMapper.updateById(bc);
+                fixed++;
+            }
+        }
+        Map<String, Object> result = Map.of("message", "标准化完成", "fixedCount", fixed);
+        log.info("[管理标准化] 修复箱序号前导零: {} 条", fixed);
+        return Result.success(result);
+    }
 }
