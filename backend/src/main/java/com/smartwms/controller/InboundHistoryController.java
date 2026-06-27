@@ -17,6 +17,8 @@ import com.smartwms.mapper.BarcodeMapper;
 import com.smartwms.mapper.InboundDetailMapper;
 import com.smartwms.mapper.InboundOrderMapper;
 import com.smartwms.service.InboundService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,6 +31,8 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/inbound")
 public class InboundHistoryController {
+
+    private static final Logger log = LoggerFactory.getLogger(InboundHistoryController.class);
 
     private final InboundOrderMapper inboundOrderMapper;
     private final InboundDetailMapper inboundDetailMapper;
@@ -163,6 +167,7 @@ public class InboundHistoryController {
             @RequestParam(required = false) String orderNo,
             @RequestParam(required = false) String materialCode) {
 
+        log.info("[入库流水] 查询 page={} size={} orderNo={} materialCode={}", page, size, orderNo, materialCode);
         LambdaQueryWrapper<Barcode> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Barcode::getType, "inbound");
 
