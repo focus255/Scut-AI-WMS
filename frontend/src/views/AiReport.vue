@@ -72,7 +72,7 @@
           <div class="ds-item">
             <span class="ds-label">风险等级</span>
             <span class="badge badge-lg" :class="'badge-' + levelBadge(report.riskLevel)">
-              {{ report.riskLevel }}
+              {{ levelLabel(report.riskLevel) }}
             </span>
           </div>
         </div>
@@ -239,16 +239,20 @@ function statusLabel(s) {
   return m[s] || s
 }
 function riskBadge(r) {
-  const m = { 'LOW_STOCK': 'danger', 'DEAD_STOCK': 'warn', 'BOTH': 'danger', 'NORMAL': 'success' }
-  return m[r] || 'default'
+  const m = { 'LOW_STOCK': 'danger', 'DEAD_STOCK': 'danger', 'HIGH': 'warning', 'BOTH': 'danger', 'NORMAL': 'success' }
+  return m[r] || 'info'
 }
 function riskLabel(r) {
-  const m = { 'LOW_STOCK': '⚠ 断供预警', 'DEAD_STOCK': '📉 呆滞风险', 'BOTH': '🚨 双重风险', 'NORMAL': '✅ 正常' }
+  const m = { 'LOW_STOCK': '断供预警', 'DEAD_STOCK': '呆滞风险', 'HIGH': '高储预警', 'BOTH': '双重风险', 'NORMAL': '正常' }
   return m[r] || r
 }
 function levelBadge(l) {
-  const m = { 'CRITICAL': 'danger', 'HIGH': 'warn', 'MEDIUM': 'default', 'LOW': 'success' }
-  return m[l] || 'default'
+  const m = { 'CRITICAL': 'danger', 'HIGH': 'warning', 'MEDIUM': 'info', 'LOW': 'success' }
+  return m[l] || 'info'
+}
+function levelLabel(l) {
+  const m = { 'CRITICAL': '严重', 'HIGH': '高', 'MEDIUM': '中', 'LOW': '低' }
+  return m[l] || l
 }
 function sourceLabel(s) {
   const m = { 'SUCCESS': 'AI 大模型', 'FAILED': '调用失败', 'MOCKED': '本地规则引擎', 'PENDING': '等待分析', 'RUNNING': '分析中' }
