@@ -440,12 +440,6 @@ function renderDemandCharts() {
     const inHist = parseHistory(d.inboundHistory)
     if (outHist.length === 0) return
 
-    // 零历史物料：不渲染空图表，显示占位提示文字
-    if (isZeroHistory(d)) {
-      el.innerHTML = '<div style="height:200px;display:flex;align-items:center;justify-content:center;color:#909399;font-size:13px;flex-direction:column;gap:4px"><span>无历史消耗数据</span><span style="font-size:11px">该物料近12周出库量为零</span></div>'
-      return
-    }
-
     const outFull = [...outHist, d.week1, d.week2, d.week3, d.week4]
     const inFull = inHist.length > 0
       ? [...inHist, d.inWeek1, d.inWeek2, d.inWeek3, d.inWeek4]
