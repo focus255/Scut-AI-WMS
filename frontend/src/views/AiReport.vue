@@ -220,7 +220,9 @@ async function handleRegenerate() {
 }
 
 function handleConvert() {
-  ElMessage.success('正在跳转入库单页，AI 建议数据已自动填充')
+  // 后台异步重新生成报告，确保下次查询时获得最新分析
+  triggerPredict(report.value.materialCode).catch(() => {})
+  ElMessage.success('已采纳建议并触发报告刷新，正在跳转入库单页…')
   router.push({
     path: '/inbound-outbound',
     query: { materialCode: report.value.materialCode, suggestedQty: report.value.suggestedQty }

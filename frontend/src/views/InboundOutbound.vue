@@ -728,6 +728,7 @@ import { getOutboundOrders, createOutbound, updateOutbound, deleteOutbound, conf
 import { getSuppliers } from '@/api/suppliers'
 import { getMaterials } from '@/api/materials'
 import { getAppliances } from '@/api/appliances'
+import { triggerPredict } from '@/api/ai'
 import { useUserStore } from '@/stores/user'
 import QRCode from '@/components/QRCode.vue'
 import BoxLabel from '@/components/BoxLabel.vue'
@@ -1006,6 +1007,10 @@ async function handleCreate() {
       supplierCode: inboundForm.selectedSuppliers[0],
       details: inboundForm.details.map(d => ({ materialCode: d.materialCode, boxCount: d.boxCount, planQty: d.planQty || (d.boxCount * d.packCapacity) }))
     })
+    // 后台异步刷新 AI 报告，确保建议反映最新库存
+    for (const d of inboundForm.details) {
+      if (d.materialCode) triggerPredict(d.materialCode).catch(() => {})
+    }
     ElMessage.success('入库单创建成功')
     dialogVisible.value = false
     loadOrders()
@@ -1039,6 +1044,8 @@ async function handleConfirmSubmit() {
       actualQty: d._actualQty
     }))
     await confirmInbound(confirmTarget.value.id, details)
+    // 库存已变化，异步刷新 AI 报告
+    confirmDetails.value.forEach(d => triggerPredict(d.materialCode).catch(() => {}))
     ElMessage.success('入库确认成功')
     confirmVisible.value = false
     loadOrders()
