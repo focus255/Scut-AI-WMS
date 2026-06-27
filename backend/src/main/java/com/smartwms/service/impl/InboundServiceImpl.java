@@ -509,26 +509,30 @@ public class InboundServiceImpl implements InboundService {
         boolean hasOrderNo = orderNo != null && !orderNo.isEmpty();
 
         // 如果指定了入库单号，先查入库单 ID
-        Long inboundId = null;
+        List<Long> inboundIds = null;
         if (hasOrderNo) {
-            InboundOrder order = inboundOrderMapper.selectOne(
+            List<InboundOrder> orders = inboundOrderMapper.selectList(
                     new LambdaQueryWrapper<InboundOrder>()
                             .like(InboundOrder::getOrderNo, "%" + orderNo + "%")
+                            .last("LIMIT 50")
             );
-            if (order != null) {
-                inboundId = order.getId();
-            } else {
+            if (orders.isEmpty()) {
                 return InventoryTraceVO.of(new ArrayList<>());
             }
+            // 支持多个订单匹配（模糊搜索可能命中多个）
+            inboundIds = orders.stream().map(InboundOrder::getId).collect(Collectors.toList());
         }
 
-        // 按条件查询二维码（仅入库类型），无任何条件时返回全部
+        // 按条件查询二维码（仅入库类型），无任何条件时默认返回最近 200 条
         LambdaQueryWrapper<Barcode> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Barcode::getType, "inbound");
         if (hasMaterial) wrapper.eq(Barcode::getMaterialCode, materialCode);
         if (hasBarcode) wrapper.eq(Barcode::getBarcode, barcode);
-        if (inboundId != null) wrapper.eq(Barcode::getInboundId, inboundId);
+        if (inboundIds != null) wrapper.in(Barcode::getInboundId, inboundIds);
         wrapper.orderByDesc(Barcode::getCreatedAt);
+        if (!hasMaterial && !hasBarcode && inboundIds == null) {
+            wrapper.last("LIMIT 200");
+        }
 
         List<Barcode> barcodes = barcodeMapper.selectList(wrapper);
         List<InventoryTraceVO.TraceItem> items = new ArrayList<>();
