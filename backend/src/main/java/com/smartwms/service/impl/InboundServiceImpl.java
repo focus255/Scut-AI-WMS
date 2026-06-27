@@ -93,15 +93,38 @@ public class InboundServiceImpl implements InboundService {
         return appliance.getPackCapacity();
     }
 
+    /**
+     * 从数据库查询当天已有订单号的最大序号，初始化计数器。
+     * 避免应用重启后 ORDER_SEQ 从 0 开始导致订单号重复。
+     */
+    private void initSeqFromDb(String datePart, String prefix, AtomicInteger seq) {
+        String likePattern = prefix + datePart + "%";
+        List<InboundOrder> todayOrders = inboundOrderMapper.selectList(
+            new LambdaQueryWrapper<InboundOrder>()
+                .likeRight(InboundOrder::getOrderNo, prefix + datePart)
+        );
+        int maxSeq = 0;
+        for (InboundOrder o : todayOrders) {
+            String no = o.getOrderNo();
+            if (no != null && no.length() >= prefix.length() + 8) {
+                try {
+                    int s = Integer.parseInt(no.substring(prefix.length() + 8));
+                    if (s > maxSeq) maxSeq = s;
+                } catch (NumberFormatException ignored) { }
+            }
+        }
+        seq.set(maxSeq);
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public InboundOrder create(InboundOrderRequest request) {
-        // 生成唯一入库单号 RK + 日期 + 序号（AtomicInteger 防并发重复）
+        // 生成唯一入库单号 RK + 日期 + 序号（从数据库初始化，防重启重复）
         String datePart = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         if (!datePart.equals(lastDate)) {
             synchronized (InboundServiceImpl.class) {
                 if (!datePart.equals(lastDate)) {
-                    ORDER_SEQ.set(0);
+                    initSeqFromDb(datePart, "RK", ORDER_SEQ);
                     lastDate = datePart;
                 }
             }
@@ -154,7 +177,7 @@ public class InboundServiceImpl implements InboundService {
                 if (boxQty <= 0) boxQty = packCapacity; // 整除时末箱也是整箱
 
                 String barcodeStr = buildBarcode(item.getMaterialCode(), supplierCode, planQty,
-                        packCapacity, boxQty, i + 1);
+                        packCapacity, boxQty, i + 1, orderNo);
                 Barcode barcode = new Barcode();
                 barcode.setMaterialCode(item.getMaterialCode());
                 barcode.setSupplierCode(supplierCode);
@@ -342,7 +365,7 @@ public class InboundServiceImpl implements InboundService {
                 if (boxQty <= 0) boxQty = packCapacity;
 
                 String barcodeStr = buildBarcode(item.getMaterialCode(), supplierCode, planQty,
-                        packCapacity, boxQty, i + 1);
+                        packCapacity, boxQty, i + 1, orderNo);
                 Barcode barcode = new Barcode();
                 barcode.setMaterialCode(item.getMaterialCode());
                 barcode.setSupplierCode(supplierCode);
@@ -564,7 +587,7 @@ public class InboundServiceImpl implements InboundService {
             if (!datePart.equals(lastDate)) {
                 synchronized (InboundServiceImpl.class) {
                     if (!datePart.equals(lastDate)) {
-                        ORDER_SEQ.set(0);
+                        initSeqFromDb(datePart, "RK", ORDER_SEQ);
                         lastDate = datePart;
                     }
                 }
@@ -613,14 +636,16 @@ public class InboundServiceImpl implements InboundService {
                                 int planQty,
                                 int packCapacity,
                                 int actualQty,
-                                int boxNo) {
-        return String.format("WMS|%s|%s|%d|%d|%d|%d",
+                                int boxNo,
+                                String orderNo) {
+        return String.format("WMS|%s|%s|%d|%d|%d|%d|%s",
                 materialCode,
                 supplierCode,
                 planQty,
                 packCapacity,
                 actualQty,
-                boxNo);
+                boxNo,
+                orderNo);
     }
 
     private int parseIntSafe(String s, int defaultVal) {

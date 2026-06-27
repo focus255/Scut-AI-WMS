@@ -96,6 +96,29 @@ public class OutboundServiceImpl implements OutboundService {
     }
 
     /**
+     * 从数据库查询当天已有出库单号的最大序号，初始化计数器。
+     * 避免应用重启后 OUTBOUND_SEQ 从 0 开始导致订单号重复。
+     */
+    private void initOutboundSeqFromDb(String datePart) {
+        String likePrefix = "CK" + datePart;
+        List<OutboundOrder> todayOrders = outboundOrderMapper.selectList(
+            new LambdaQueryWrapper<OutboundOrder>()
+                .likeRight(OutboundOrder::getOrderNo, likePrefix)
+        );
+        int maxSeq = 0;
+        for (OutboundOrder o : todayOrders) {
+            String no = o.getOrderNo();
+            if (no != null && no.length() >= likePrefix.length()) {
+                try {
+                    int s = Integer.parseInt(no.substring(likePrefix.length()));
+                    if (s > maxSeq) maxSeq = s;
+                } catch (NumberFormatException ignored) { }
+            }
+        }
+        OUTBOUND_SEQ.set(maxSeq);
+    }
+
+    /**
      * 创建出库单，按整箱 FIFO 选取入库二维码，不做拆零重封装。
      */
     @Override
@@ -105,7 +128,7 @@ public class OutboundServiceImpl implements OutboundService {
         if (!datePart.equals(lastOutboundDate)) {
             synchronized (OutboundServiceImpl.class) {
                 if (!datePart.equals(lastOutboundDate)) {
-                    OUTBOUND_SEQ.set(0);
+                    initOutboundSeqFromDb(datePart);
                     lastOutboundDate = datePart;
                 }
             }
