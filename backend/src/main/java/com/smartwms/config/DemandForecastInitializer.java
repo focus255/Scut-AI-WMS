@@ -36,6 +36,15 @@ public class DemandForecastInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        // 清理脏数据：删除 materialCode 为 generate-all 等无效记录的预测
+        int cleaned = forecastMapper.delete(
+            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.smartwms.entity.DemandForecast>()
+                .eq(com.smartwms.entity.DemandForecast::getMaterialCode, "generate-all")
+        );
+        if (cleaned > 0) {
+            log.info("[需求预测] 已清理 {} 条无效预测记录 (materialCode=generate-all)", cleaned);
+        }
+
         if (forecastMapper.selectCount(null) > 0) {
             log.info("[需求预测] 已有预测数据，跳过自动生成");
             return;

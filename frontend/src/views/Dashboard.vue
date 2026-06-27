@@ -272,10 +272,24 @@ function volLabel(v) { return { 'HIGH': '高波动', 'MEDIUM': '中波动', 'LOW
 
 const chartInstances = {}
 
+/**
+ * 判断 materialCode 是否为合法的物料号。
+ * 排除 API 端点名（如 generate-all）等脏数据。
+ */
+function isValidMaterialCode(code) {
+  if (!code || typeof code !== 'string') return false
+  // 排除已知脏数据
+  if (code === 'generate-all') return false
+  // 必须以 M_PART_ 或合法前缀开头
+  return /^[A-Z0-9]+_/.test(code)
+}
+
 async function loadDemand() {
   demandLoading.value = true
   try {
-    demandData.value = await getDemandForecasts() || []
+    const raw = await getDemandForecasts() || []
+    // 过滤：只保留合法物料号且 12 周历史不全为零的记录
+    demandData.value = raw.filter(d => isValidMaterialCode(d.materialCode) && parseHistory(d.weeklyHistory).some(v => v > 0))
   } catch { /* */ }
   finally { demandLoading.value = false }
 }

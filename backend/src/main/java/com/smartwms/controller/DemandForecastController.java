@@ -26,6 +26,10 @@ public class DemandForecastController {
     /** 重新生成单个物料预测 */
     @PostMapping("/forecasts/{materialCode}")
     public Result<DemandForecast> regenerate(@PathVariable String materialCode) {
+        // 防止 generate-all 等 API 路径名被误当作物料号
+        if ("generate-all".equals(materialCode)) {
+            return Result.error(400, "无效的物料编码: generate-all");
+        }
         return Result.success(service.generate(materialCode));
     }
 
