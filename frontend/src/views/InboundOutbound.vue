@@ -815,48 +815,64 @@ async function printBarcodes(row) {
         .catch(() => '')
     ))
 
-    // 构建卡片 HTML
+    // 批量获取器具类型（与屏幕看板一致）
+    const matSupSet = new Set()
+    barcodes.forEach(bc => {
+      const parts = (bc.barcode || '').split('|')
+      if (parts[1] && parts[2]) matSupSet.add(parts[1] + '|' + parts[2])
+    })
+    const packTypeMap = {}
+    if (matSupSet.size > 0) {
+      try {
+        const appData = await getAppliances({ page: 1, size: 200 })
+        const apps = appData.records || []
+        for (const key of matSupSet) {
+          const [mat, sup] = key.split('|')
+          const app = apps.find(a => a.materialCode === mat && a.supplierCode === sup)
+          packTypeMap[key] = app?.packType || '—'
+        }
+      } catch { /* */ }
+    }
+
+    // 构建卡片 HTML（与 BoxLabel 组件完全一致的布局）
     let cardsHtml = ''
     for (let i = 0; i < barcodes.length; i++) {
       const bc = barcodes[i]
       const parts = (bc.barcode || '').split('|')
       const materialCode = h(parts[1] || '—')
       const supplierCode = h(parts[2] || '—')
-      const packCapacity = h(parts[4] || '—')
-      const actualQty = bc.remainingQty != null ? bc.remainingQty : h(parts[5] || '—')
-      const boxSeq = h(parts[6] || '—')
+      const packCapacity = parts[4] || '—'
+      const packType = h(packTypeMap[parts[1] + '|' + parts[2]] || '—')
       const createdAt = bc.createdAt ? bc.createdAt.substring(0, 10) : '—'
-      cardsHtml += `<div class="lc">
-        <div class="lq"><img src="${qrUrls[i]}" width="80" height="80" onerror="this.style.display='none'"></div>
-        <div class="li">
-          <div class="lr"><span class="lk">物料</span><span class="lv">${materialCode}</span></div>
-          <div class="lr"><span class="lk">供应商</span><span class="lv">${supplierCode}</span></div>
-          <div class="lr"><span class="lk">箱容量</span><span class="lv">${packCapacity}件</span></div>
-          <div class="lr"><span class="lk">数量</span><span class="lv">${actualQty}件</span></div>
-          <div class="lr"><span class="lk">箱号</span><span class="lv">${boxSeq}</span></div>
-          <div class="lr"><span class="lk">日期</span><span class="lv">${createdAt}</span></div>
-        </div>
+      const barcodeFull = h(bc.barcode || '—')
+      cardsHtml += `<div class="kc">
+        <div class="kq"><img src="${qrUrls[i]}" width="100" height="100" onerror="this.style.display='none'"></div>
+        <table class="kt">
+          <tr><td class="kl">物料号</td><td class="kv">${materialCode}</td></tr>
+          <tr><td class="kl">供应商</td><td class="kv">${supplierCode}</td></tr>
+          <tr><td class="kl">器具</td><td class="kv">${packType}</td></tr>
+          <tr><td class="kl">日期</td><td class="kv">${createdAt}</td></tr>
+          <tr><td class="kl">数量</td><td class="kv">${packCapacity} 件/箱</td></tr>
+          <tr><td class="kl">看板号</td><td class="kv kn">${barcodeFull}</td></tr>
+        </table>
       </div>`
     }
 
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${typeLabel}看板_${orderNo}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>看板_${orderNo}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Microsoft YaHei',sans-serif;padding:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-h4{text-align:center;font-size:13px;margin:0 0 8px}
-h4 span{font-size:10px;color:#888;font-weight:normal}
-.g{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.lc{display:flex;gap:6px;border:1.5px solid #333;padding:6px;border-radius:2px;page-break-inside:avoid}
-.lq{width:80px;height:80px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-.lq img{width:80px;height:80px}
-.li{flex:1;font-size:8px;display:flex;flex-direction:column;justify-content:center;gap:1px}
-.lr{display:flex;justify-content:space-between}
-.lk{color:#888}.lv{font-weight:600;color:#111}
-@media print{body{padding:5mm}.lc{border-color:#000}@page{size:A4;margin:6mm}}
-</style></head><body>
-<h4>智库WMS — ${typeLabel}看板 <span>${orderNo} / ${barcodes.length}个</span></h4>
-<div class="g">${cardsHtml}</div>
-</body></html>`
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.kc{background:#fff;border:2px solid #2c3e50;border-radius:4px;display:flex;align-items:center;gap:12px;padding:10px;width:420px;margin:0 auto;page-break-after:always}
+.kc:last-child{page-break-after:auto}
+.kq{width:100px;height:100px;flex-shrink:0;border:1px solid #eee;border-radius:3px;padding:3px;background:#fff;display:flex;align-items:center;justify-content:center}
+.kq img{width:92px;height:92px}
+.kt{flex:1;min-width:0;border-collapse:collapse;font-size:12px}
+.kt td{padding:2px 6px;vertical-align:middle}
+.kl{color:#888;font-size:11px;white-space:nowrap;width:48px}
+.kv{color:#222;font-weight:600;font-size:12px}
+.kn{font-size:10px;font-family:"Courier New",monospace;word-break:break-all}
+@media print{@page{size:A4;margin:8mm}}
+</style></head><body>${cardsHtml}</body></html>`
 
     // 使用隐藏 iframe 方式打印，避免弹窗被拦截且保证图片加载完成
     const oldFrame = document.getElementById('print-frame')
