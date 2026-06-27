@@ -571,6 +571,7 @@
               :label="`${m.materialCode} — ${m.materialName}`" :value="m.materialCode" />
           </el-select>
           <el-button type="primary" size="small" @click="loadInboundFlow">查询</el-button>
+          <span style="font-size:11px;color:red;margin-left:8px">[调试:{{ inboundFlowDebug }}]</span>
         </div>
         <el-table :data="inboundFlowList" stripe size="small" v-loading="inboundFlowLoading"
           empty-text="暂无入库流水记录">
@@ -614,6 +615,7 @@
               :label="`${m.materialCode} — ${m.materialName}`" :value="m.materialCode" />
           </el-select>
           <el-button type="primary" size="small" @click="loadHistories">查询</el-button>
+          <span style="font-size:11px;color:red;margin-left:8px">[调试:{{ historyDebug }}]</span>
         </div>
         <el-table :data="historyList" stripe size="small" v-loading="historyLoading"
           empty-text="暂无出库流水记录">
@@ -1520,10 +1522,12 @@ const inboundFlowLoading = ref(false)
 const inboundFlowList = ref([])
 const inboundFlowOrderNo = ref('')
 const inboundFlowMaterial = ref('')
+const inboundFlowDebug = ref('未调用')
 // 缓存 inboundId → orderNo 映射
 const inboundOrderNoMap = ref({})
 
 function openInboundFlowDialog() {
+  inboundFlowDebug.value = '弹窗打开中...'
   inboundFlowOrderNo.value = ''
   inboundFlowMaterial.value = ''
   inboundFlowList.value = []
@@ -1531,6 +1535,8 @@ function openInboundFlowDialog() {
 }
 
 async function loadInboundFlow() {
+  const ts = Date.now() % 100000
+  inboundFlowDebug.value = '调用#' + ts
   inboundFlowLoading.value = true
   try {
     const params = { page: 1, size: 200 }
@@ -1538,8 +1544,10 @@ async function loadInboundFlow() {
     const mc = inboundFlowMaterial.value?.trim()
     if (on) params.orderNo = on
     if (mc) params.materialCode = mc
+    inboundFlowDebug.value = '请求中#' + ts + ' on=' + (on||'-') + ' mc=' + (mc||'-')
     const data = await getInboundFlow(params)
     inboundFlowList.value = data.records || []
+    inboundFlowDebug.value = '成功#' + ts + ' 共' + (data.records||[]).length + '条'
     // 构建 inboundId → 单号缓存
     const ids = [...new Set(inboundFlowList.value.map(r => r.inboundId).filter(Boolean))]
     for (const id of ids) {
@@ -1568,8 +1576,10 @@ const historyLoading = ref(false)
 const historyList = ref([])
 const historyOrderNo = ref('')
 const historyMaterial = ref('')
+const historyDebug = ref('未调用')
 
 function openHistoryDialog() {
+  historyDebug.value = '弹窗打开中...'
   historyOrderNo.value = ''
   historyMaterial.value = ''
   historyList.value = []
@@ -1577,6 +1587,8 @@ function openHistoryDialog() {
 }
 
 async function loadHistories() {
+  const ts = Date.now() % 100000
+  historyDebug.value = '调用#' + ts
   historyLoading.value = true
   try {
     const params = { page: 1, size: 50 }
@@ -1584,10 +1596,13 @@ async function loadHistories() {
     const mc = historyMaterial.value?.trim()
     if (on) params.orderNo = on
     if (mc) params.materialCode = mc
+    historyDebug.value = '请求中#' + ts
     const data = await getOutboundHistories(params)
     historyList.value = data.records || []
+    historyDebug.value = '成功#' + ts + ' 共' + (data.records||[]).length + '条'
   } catch (err) {
     historyList.value = []
+    historyDebug.value = '失败#' + ts + ' ' + (err?.message || '?')
     ElMessage.error('查询失败: ' + (err?.message || '未知错误'))
   } finally {
     historyLoading.value = false
