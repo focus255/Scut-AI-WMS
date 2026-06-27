@@ -62,6 +62,14 @@ export function getInventoryTrace(params) {
 }
 
 /**
+ * 删除入库单及其关联的条码和明细。
+ * @param {number} id 入库单主键 ID
+ */
+export function deleteInbound(id) {
+  return request.delete(`/inbound/orders/${id}`)
+}
+
+/**
  * 入库流水查询：按入库单号/物料号筛选二维码记录。
  * @param {Object} params { page, size, orderNo?, materialCode? }
  */

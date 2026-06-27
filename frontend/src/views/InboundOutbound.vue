@@ -34,20 +34,18 @@
               </template>
             </el-table-column>
             <el-table-column prop="createdAt" label="创建时间" min-width="170" show-overflow-tooltip />
-            <el-table-column label="操作" width="260" align="center">
+            <el-table-column label="操作" width="280" align="center">
               <template #default="{ row }">
                 <el-button v-if="row.status !== '已完成'" type="primary" link size="small"
-                  @click.stop="openEditDialog(row)">
-                  编辑
-                </el-button>
+                  @click.stop="openEditDialog(row)">编辑</el-button>
                 <el-button v-if="row.status !== '已完成'" type="success" link size="small"
-                  @click.stop="openConfirmDialog(row)">
-                  确认入库
+                  @click.stop="openConfirmDialog(row)">确认入库</el-button>
+                <el-button type="danger" link size="small" @click.stop="handleInboundDelete(row)">
+                  <el-icon :size="14"><Delete /></el-icon>删除
                 </el-button>
-                <el-button link size="small" @click.stop="openPrintDialog(row)">
-                  <el-icon :size="14"><Printer /></el-icon>打印
+                <el-button link size="small" @click.stop="printBarcodes(row)">
+                  <el-icon :size="14"><Printer /></el-icon>打印看板
                 </el-button>
-                <span v-if="row.status === '已完成'" class="muted-text">无需操作</span>
               </template>
             </el-table-column>
           </el-table>
@@ -79,21 +77,18 @@
               </template>
             </el-table-column>
             <el-table-column prop="createdAt" label="创建时间" min-width="170" show-overflow-tooltip />
-            <el-table-column label="操作" width="280" align="center">
+            <el-table-column label="操作" width="300" align="center">
               <template #default="{ row }">
                 <el-button v-if="row.status !== '已完成'" type="primary" link size="small"
-                  @click.stop="openOutEditDialog(row)">
-                  编辑
-                </el-button>
-                <el-button v-if="row.status === '未完成'" type="danger" link size="small"
-                  @click.stop="handleOutDelete(row)">
-                  删除
-                </el-button>
+                  @click.stop="openOutEditDialog(row)">编辑</el-button>
                 <el-button v-if="row.status !== '已完成'" type="success" link size="small"
-                  @click.stop="openOutConfirmDialog(row)">
-                  确认出库
+                  @click.stop="openOutConfirmDialog(row)">确认出库</el-button>
+                <el-button type="danger" link size="small" @click.stop="handleOutDelete(row)">
+                  <el-icon :size="14"><Delete /></el-icon>删除
                 </el-button>
-                <span v-if="row.status === '已完成'" class="muted-text">无需操作</span>
+                <el-button link size="small" @click.stop="printBarcodes(row)">
+                  <el-icon :size="14"><Printer /></el-icon>打印看板
+                </el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -347,60 +342,6 @@
           </div>
         </template>
     </el-drawer>
-
-    <!-- 打印入库单对话框 (Teleport to body) -->
-    <Teleport to="body">
-      <el-dialog v-model="printVisible" title="打印预览 — 入库单"
-        width="min(700px, calc(100vw - 32px))" destroy-on-close>
-        <div class="print-area" id="printInboundArea">
-          <div v-if="printOrder" class="print-content">
-            <h2>智库 WMS — 入库单</h2>
-            <div class="print-meta">
-              <span><strong>单号：</strong>{{ printOrder.orderNo }}</span>
-              <span><strong>供应商：</strong>{{ printOrder.supplierCode }}</span>
-              <span><strong>状态：</strong>{{ printOrder.status }}</span>
-              <span><strong>创建时间：</strong>{{ printOrder.createdAt }}</span>
-            </div>
-            <table class="print-table">
-              <thead>
-                <tr>
-                  <th>序号</th><th>物料号</th><th>单箱容量</th><th>计划数</th><th>实收数</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(d, i) in printOrder.details" :key="i">
-                  <td>{{ i + 1 }}</td>
-                  <td>{{ d.materialCode }}</td>
-                  <td>{{ d.packCapacity }}</td>
-                  <td>{{ d.planQty }}</td>
-                  <td>{{ d.actualQty }}</td>
-                </tr>
-              </tbody>
-            </table>
-            <!-- 入库看板 -->
-            <div v-if="printOrder.barcodes && printOrder.barcodes.length > 0"
-              class="print-labels">
-              <div class="barcode-gallery-title">入库看板（共 {{ printOrder.barcodes.length }} 个）</div>
-              <div class="label-print-grid">
-                <div v-for="bc in printOrder.barcodes" :key="bc.barcode" class="label-print-item">
-                  <BoxLabel :barcode="bc.barcode"
-                    :created-at="bc.createdAt" />
-                  <div class="label-stamp" :class="'stamp-' + stampClass(bc.status)">{{ bc.status || '在库' }}</div>
-                </div>
-              </div>
-            </div>
-            <div class="print-footer">
-              <span>打印时间：{{ new Date().toLocaleString('zh-CN') }}</span>
-              <span>操作员：{{ userStore?.username || '—' }}</span>
-            </div>
-          </div>
-        </div>
-        <template #footer>
-          <el-button @click="printVisible = false">关闭</el-button>
-          <el-button type="primary" @click="doPrint">打印</el-button>
-        </template>
-      </el-dialog>
-    </Teleport>
 
     <!-- 新建出库单右侧抽屉 -->
     <el-drawer v-model="outDialogVisible" title="新建出库单"
@@ -723,7 +664,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Printer, Download } from '@element-plus/icons-vue'
-import { getInboundOrders, createInbound, updateInbound, confirmInbound, getInboundDetail, getInboundFlow } from '@/api/inbound'
+import { getInboundOrders, createInbound, updateInbound, confirmInbound, getInboundDetail, getInboundFlow, deleteInbound } from '@/api/inbound'
 import { getOutboundOrders, createOutbound, updateOutbound, deleteOutbound, confirmOutbound, getOutboundDetail, getOutboundHistories } from '@/api/outbound'
 import { getSuppliers } from '@/api/suppliers'
 import { getMaterials } from '@/api/materials'
@@ -733,6 +674,7 @@ import { useUserStore } from '@/stores/user'
 import QRCode from '@/components/QRCode.vue'
 import BoxLabel from '@/components/BoxLabel.vue'
 import MaterialPickerDialog from '@/components/MaterialPickerDialog.vue'
+import QRCodeLib from 'qrcode'
 
 const route = useRoute()
 const router = useRouter()
@@ -848,8 +790,87 @@ const detailVisible = ref(false)
 const detailData = ref(null)
 
 // ==================== 打印 ====================
-const printVisible = ref(false)
-const printOrder = ref(null)
+// ==================== 打印看板 ====================
+
+/**
+ * 批量打印出入库单中的所有看板标签，直接调用浏览器打印。
+ * 使用 qrcode 库在本地预生成二维码，打开新窗口即打。
+ *
+ * @param {Object} row 列表行数据 { id, orderNo }
+ */
+async function printBarcodes(row) {
+  try {
+    const detail = activeTab.value === 'inbound'
+      ? await getInboundDetail(row.id)
+      : await getOutboundDetail(row.id)
+    const barcodes = detail?.barcodes || []
+    if (barcodes.length === 0) {
+      ElMessage.warning('该单据无看板可打印')
+      return
+    }
+    const orderNo = detail.orderNo || row.orderNo || ''
+    const typeLabel = activeTab.value === 'inbound' ? '入库' : '出库'
+
+    // 预生成所有二维码 data URL
+    const qrPromises = barcodes.map(bc =>
+      QRCodeLib.toDataURL(bc.barcode, { width: 120, margin: 1, errorCorrectionLevel: 'M' })
+        .catch(() => '')
+    )
+    const qrUrls = await Promise.all(qrPromises)
+
+    // 构建卡片 HTML
+    let cardsHtml = ''
+    for (let i = 0; i < barcodes.length; i++) {
+      const bc = barcodes[i]
+      const parts = (bc.barcode || '').split('|')
+      const materialCode = h(parts[1] || '—')
+      const supplierCode = h(parts[2] || '—')
+      const packCapacity = h(parts[4] || '—')
+      const actualQty = bc.remainingQty != null ? bc.remainingQty : h(parts[5] || '—')
+      const boxSeq = h(parts[6] || '—')
+      const createdAt = bc.createdAt ? bc.createdAt.substring(0, 10) : '—'
+      cardsHtml += `
+        <div class="lc">
+          <div class="lq"><img src="${qrUrls[i]}" width="80" height="80" alt="QR"></div>
+          <div class="li">
+            <div class="lr"><span class="lk">物料</span><span class="lv">${materialCode}</span></div>
+            <div class="lr"><span class="lk">供应商</span><span class="lv">${supplierCode}</span></div>
+            <div class="lr"><span class="lk">箱容量</span><span class="lv">${packCapacity}件</span></div>
+            <div class="lr"><span class="lk">数量</span><span class="lv">${actualQty}件</span></div>
+            <div class="lr"><span class="lk">箱号</span><span class="lv">${boxSeq}</span></div>
+            <div class="lr"><span class="lk">日期</span><span class="lv">${createdAt}</span></div>
+          </div>
+        </div>`
+    }
+
+    const printWin = window.open('', '_blank', 'width=800,height=600')
+    printWin.document.write(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>${typeLabel}看板_${orderNo}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft YaHei',sans-serif;padding:8px}
+h4{text-align:center;font-size:12px;margin:0 0 6px}
+h4 span{font-size:10px;color:#888;font-weight:normal}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.lc{display:flex;gap:6px;border:1.5px solid #333;padding:5px;border-radius:2px;page-break-inside:avoid}
+.lq{width:80px;height:80px;flex-shrink:0}
+.lq img{width:80px;height:80px}
+.li{flex:1;font-size:8px;display:flex;flex-direction:column;justify-content:center;gap:0}
+.lr{display:flex;justify-content:space-between}
+.lk{color:#888}.lv{font-weight:600;color:#111}
+@media print{body{padding:4mm}.lc{border-color:#000}}
+@page{size:A4;margin:6mm}
+</style></head><body>
+<h4>智库WMS — ${typeLabel}看板 <span>${orderNo} / ${barcodes.length}个</span></h4>
+<div class="g">${cardsHtml}</div>
+<script>setTimeout(()=>{window.print();window.close()},300)<\\/script>
+</body></html>`)
+    printWin.document.close()
+  } catch (err) {
+    ElMessage.error('加载看板数据失败')
+  }
+}
+function h(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
 
 // ==================== 计算属性 ====================
 const pendingCount = computed(() => inboundList.value.filter(row => row.status !== '已完成').length)
@@ -1220,49 +1241,16 @@ async function openDetailDialog(row) {
   }
 }
 
-// ==================== 打印入库单 ====================
-async function openPrintDialog(row) {
-  printOrder.value = null
-  printVisible.value = true
+// ==================== 入库单删除 ====================
+async function handleInboundDelete(row) {
   try {
-    printOrder.value = await getInboundDetail(row.id)
-  } catch {
-    ElMessage.error('加载入库单详情失败')
-    printVisible.value = false
-  }
-}
-
-function doPrint() {
-  const printContent = document.getElementById('printInboundArea')
-  if (!printContent) return
-  const win = window.open('', '_blank', 'width=800,height=600')
-  win.document.write(`
-    <html><head><title>打印入库单</title>
-    <style>
-      body { font-family: 'Microsoft YaHei', sans-serif; padding: 20px; color: #333; }
-      h2 { text-align: center; margin-bottom: 16px; font-size: 18px; }
-      .print-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
-        margin-bottom: 20px; padding: 10px; background: #f5f5f5; border-radius: 4px; }
-      .print-meta span { font-size: 13px; }
-      table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-      th, td { border: 1px solid #333; padding: 6px 10px; text-align: left; font-size: 14px; }
-      th { background: #e0e0e0; }
-      .print-labels { margin-top: 16px; padding-top: 12px; border-top: 1px solid #ccc; }
-      .barcode-gallery-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
-      .label-print-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-      .label-print-item { display: flex; justify-content: center; page-break-inside: avoid; }
-      .label-print-item canvas { max-width: 100%; height: auto; }
-      .box-label-canvas { box-shadow: none !important; }
-      .print-footer { display: flex; justify-content: space-between;
-        font-size: 12px; color: #666; margin-top: 20px; padding-top: 12px; border-top: 1px solid #ccc; }
-      @media print { body { padding: 0; } }
-    </style></head><body>
-    ${printContent.innerHTML}
-    </body></html>
-  `)
-  win.document.close()
-  win.focus()
-  setTimeout(() => { win.print(); win.close() }, 300)
+    await ElMessageBox.confirm(`确定删除入库单 ${row.orderNo}？关联条码和明细将一并清除。`, '确认删除', {
+      type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消'
+    })
+    await deleteInbound(row.id)
+    ElMessage.success('入库单已删除')
+    loadOrders()
+  } catch { /* 取消或失败 */ }
 }
 
 // ==================== 出库管理 ====================
@@ -1788,76 +1776,6 @@ async function loadHistories() {
 }
 
 /* ==================== 打印预览 ==================== */
-.print-area {
-  min-height: 200px;
-}
-.print-content h2 {
-  text-align: center;
-  margin-bottom: 12px;
-  font-size: 18px;
-}
-.print-meta {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  padding: 10px;
-  background: #f7f9fc;
-  border-radius: 4px;
-  margin-bottom: 16px;
-}
-.print-meta span {
-  font-size: 13px;
-}
-.print-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.print-table th, .print-table td {
-  border: 1px solid var(--border-base);
-  padding: 6px 10px;
-  text-align: left;
-  font-size: 13px;
-}
-.print-table th {
-  background: #f0f2f5;
-  font-weight: 600;
-}
-.print-footer {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-light);
-}
-
-/* ==================== 打印预览 — 标签网格 ==================== */
-.print-labels {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-light);
-}
-.label-print-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-.label-print-item {
-  position: relative;
-  display: flex;
-  justify-content: center;
-}
-.label-print-item :deep(.box-label-canvas) {
-  box-shadow: none;
-  border: 1px solid #ccc;
-}
-@media (max-width: 520px) {
-  .label-print-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* ==================== 响应式 ==================== */
 @media (max-width: 760px) {
   .history-stats,
