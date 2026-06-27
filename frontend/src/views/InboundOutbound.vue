@@ -1533,8 +1533,8 @@ async function loadInboundFlow() {
   inboundFlowLoading.value = true
   try {
     const params = { page: 1, size: 200 }
-    if (inboundFlowQuery.orderNo.trim()) params.orderNo = inboundFlowQuery.orderNo.trim()
-    if (inboundFlowQuery.materialCode.trim()) params.materialCode = inboundFlowQuery.materialCode.trim()
+    if (inboundFlowQuery.orderNo?.trim()) params.orderNo = inboundFlowQuery.orderNo.trim()
+    if (inboundFlowQuery.materialCode?.trim()) params.materialCode = inboundFlowQuery.materialCode.trim()
     const data = await getInboundFlow(params)
     inboundFlowList.value = data.records || []
     // 构建 inboundId → 单号缓存
@@ -1575,8 +1575,8 @@ async function loadHistories() {
   historyLoading.value = true
   try {
     const params = { page: 1, size: 50 }
-    if (historyQuery.orderNo.trim()) params.orderNo = historyQuery.orderNo.trim()
-    if (historyQuery.materialCode.trim()) params.materialCode = historyQuery.materialCode.trim()
+    if (historyQuery.orderNo?.trim()) params.orderNo = historyQuery.orderNo.trim()
+    if (historyQuery.materialCode?.trim()) params.materialCode = historyQuery.materialCode.trim()
     const data = await getOutboundHistories(params)
     historyList.value = data.records || []
   } catch {
