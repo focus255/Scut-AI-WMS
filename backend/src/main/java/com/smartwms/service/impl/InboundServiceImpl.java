@@ -173,9 +173,8 @@ public class InboundServiceImpl implements InboundService {
         order.setSupplierCode(request.getSupplierCode());
         inboundOrderMapper.insert(order);
 
-        // 收集所有物料+供应商用于订单摘要
+        // 收集实际使用的供应商用于订单摘要
         Set<String> supplierSet = new LinkedHashSet<>();
-        supplierSet.add(request.getSupplierCode());
 
         // 创建明细并生成二维码（支持按件入库，末箱允许零头，多供应商）
         for (InboundOrderRequest.InboundDetailItem item : request.getDetails()) {
@@ -365,7 +364,7 @@ public class InboundServiceImpl implements InboundService {
         }
 
         Set<String> updateSupplierSet = new LinkedHashSet<>();
-        updateSupplierSet.add(request.getSupplierCode());
+        // 不预先添加订单级供应商，由明细行自行决定
 
         // 删除旧明细（按入库单 ID 精确删除）
         inboundDetailMapper.delete(
