@@ -242,41 +242,73 @@ public class OutboundServiceImpl implements OutboundService {
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "同一出库明细不能重复确认");
             }
 
-            List<String> normalizedBarcodes = normalizeBarcodes(item.getBarcodes(), globalBarcodeSet);
-            List<Barcode> selectedBarcodes = loadBarcodesInRequestOrder(normalizedBarcodes);
-            validateSelectedBarcodes(detail, selectedBarcodes);
+            List<Barcode> selectedBarcodes;
+            if (item.getBarcodes() != null && !item.getBarcodes().isEmpty()) {
+                // 手动扫码模式：按传入的二维码列表确认
+                List<String> normalizedBarcodes = normalizeBarcodes(item.getBarcodes(), globalBarcodeSet);
+                selectedBarcodes = loadBarcodesInRequestOrder(normalizedBarcodes);
+                validateSelectedBarcodes(detail, selectedBarcodes);
+            } else {
+                // 工作台模式：通过出库流水反查本出库单已拣选的"待出库"二维码
+                List<OutboundHistory> histories = outboundHistoryMapper.selectList(
+                    new LambdaQueryWrapper<OutboundHistory>()
+                        .eq(OutboundHistory::getOutboundId, outboundId)
+                        .eq(OutboundHistory::getOutboundDetailId, detail.getId())
+                );
+                List<Long> barcodeIds = histories.stream()
+                    .map(OutboundHistory::getBarcodeId).filter(bid -> bid != null && bid > 0).distinct().toList();
+                if (barcodeIds.isEmpty()) {
+                    throw new BusinessException(ErrorCode.BAD_REQUEST,
+                        "物料 " + detail.getMaterialCode() + " 无待出库二维码，请先创建出库单完成捡货");
+                }
+                selectedBarcodes = barcodeMapper.selectBatchIds(barcodeIds).stream()
+                    .filter(bc -> "待出库".equals(bc.getStatus()))
+                    .sorted(Comparator.comparing(Barcode::getCreatedAt))
+                    .toList();
+                if (selectedBarcodes.isEmpty()) {
+                    throw new BusinessException(ErrorCode.BAD_REQUEST,
+                        "物料 " + detail.getMaterialCode() + " 的二维码已全部出库，无需重复确认");
+                }
+            }
 
-            int confirmedQty = selectedBarcodes.stream()
+            int totalPickedQty = selectedBarcodes.stream()
                     .mapToInt(bc -> bc.getRemainingQty() != null ? bc.getRemainingQty() : 0)
                     .sum();
-            if (!item.getActualQty().equals(confirmedQty)) {
-                throw new BusinessException(ErrorCode.BAD_REQUEST,
-                        "出库明细 " + detail.getId() + " 的实际数量与二维码折算数量不一致");
-            }
+            int requestQty = item.getActualQty();
 
             int currentActualQty = detail.getActualQty() != null ? detail.getActualQty() : 0;
             int planQty = detail.getPlanQty() != null ? detail.getPlanQty() : 0;
-            if (currentActualQty + confirmedQty > planQty) {
-                throw new BusinessException(ErrorCode.BAD_REQUEST,
-                        "出库明细 " + detail.getId() + " 的累计实际出库数量不能超过计划数量");
+            int confirmedQty = requestQty; // 本次实际确认出库量
+
+            if (requestQty > totalPickedQty || currentActualQty + requestQty > planQty) {
+                throw new BusinessException(ErrorCode.STOCK_INSUFFICIENT,
+                        "物料 " + detail.getMaterialCode() + " 确认数量超限（请求 " + requestQty
+                        + "，待出库 " + totalPickedQty + "，计划 " + planQty + "）");
             }
 
             Inventory inventory = inventoryMap.computeIfAbsent(detail.getMaterialCode(), this::loadInventory);
             int stockQty = inventory.getStockQty() != null ? inventory.getStockQty() : 0;
-            if (stockQty < confirmedQty) {
-                throw new BusinessException(ErrorCode.STOCK_INSUFFICIENT,
-                        "库存不足：物料 " + detail.getMaterialCode() + " 需要 " + confirmedQty + "，当前仅剩 " + stockQty);
-            }
 
-            // 逐箱确认出库（流水已在拣货时创建，此处仅更新状态）
+            // 逐箱确认出库（按 FIFO 消耗到请求量为止）
+            int remainingToConfirm = requestQty;
             for (Barcode outBarcode : selectedBarcodes) {
-                outBarcode.setStatus("已出库");
+                if (remainingToConfirm <= 0) break;
+                int boxQty = outBarcode.getRemainingQty() != null ? outBarcode.getRemainingQty() : 0;
+                if (boxQty <= 0) continue;
+                if (boxQty <= remainingToConfirm) {
+                    outBarcode.setStatus("已出库");
+                    outBarcode.setRemainingQty(0);
+                    remainingToConfirm -= boxQty;
+                } else {
+                    outBarcode.setRemainingQty(boxQty - remainingToConfirm);
+                    remainingToConfirm = 0;
+                }
                 barcodeMapper.updateById(outBarcode);
             }
 
-            detail.setActualQty(currentActualQty + confirmedQty);
+            detail.setActualQty(currentActualQty + requestQty);
             outboundDetailMapper.updateById(detail);
-            inventory.setStockQty(stockQty - confirmedQty);
+            inventory.setStockQty(stockQty - requestQty);
             inventoryMapper.updateById(inventory);
         }
 

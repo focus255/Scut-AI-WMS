@@ -30,7 +30,7 @@ public class ConfirmOutboundRequest {
         @Min(value = 1, message = "实际出库数量必须大于 0")
         private Integer actualQty;
 
-        @NotEmpty(message = "出库二维码不能为空")
+        /** 出库二维码列表（工作台模式可不传，扫码模式必传） */
         private List<String> barcodes;
 
         public Long getDetailId() { return detailId; }

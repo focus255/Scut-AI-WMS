@@ -398,51 +398,25 @@
 
     <!-- 确认出库对话框 (Teleport to body) -->
     <Teleport to="body">
-      <el-dialog v-model="outConfirmVisible" title="确认出库"
-        width="min(800px, calc(100vw - 32px))" destroy-on-close>
-        <el-alert title="系统将自动按先进先出 (FIFO) 规则校验二维码，请确保按入库先后顺序选择二维码。"
-          type="info" show-icon :closable="false" style="margin-bottom: 12px" />
+      <el-dialog v-model="outConfirmVisible" title="手工确认出库"
+        width="min(680px, calc(100vw - 32px))" destroy-on-close>
         <div class="confirm-info">
           <span class="confirm-label">出库单号：</span>
           <strong>{{ outConfirmTarget?.orderNo }}</strong>
-          <span class="confirm-divider">|</span>
-          <span class="confirm-label">状态：</span>
-          <span class="badge" :class="outStatusClass(outConfirmTarget?.status)">
-            {{ outConfirmTarget?.status }}
-          </span>
         </div>
         <el-table :data="outConfirmDetails" stripe size="small" style="margin-top: 12px">
-          <el-table-column prop="materialCode" label="物料号" min-width="130" />
-          <el-table-column prop="planQty" label="计划数" width="90" align="center" />
-          <el-table-column label="已出数" width="90" align="center">
-            <template #default="{ row }">{{ row.actualQty || 0 }}</template>
-          </el-table-column>
-          <el-table-column label="本次出库数" width="130" align="center">
+          <el-table-column prop="materialCode" label="物料号" min-width="150" />
+          <el-table-column prop="planQty" label="计划出库数" width="120" align="center" />
+          <el-table-column label="实际出库数" width="160" align="center">
             <template #default="{ row, $index }">
-              <el-input-number v-model="row._confirmQty" :min="0"
-                :max="(row.planQty || 0) - (row.actualQty || 0)"
-                size="small" controls-position="right" style="width: 110px" />
-            </template>
-          </el-table-column>
-          <el-table-column label="出库二维码" min-width="220">
-            <template #default="{ row }">
-              <div class="barcode-tag-area">
-                <el-tag v-for="(bc, i) in (row._barcodes || [])" :key="i"
-                  size="small" closable class="barcode-tag"
-                  @close="removeOutBarcode(row, i)">
-                  {{ bc }}
-                </el-tag>
-                <el-input v-model="row._barcodeInput" placeholder="扫描/输入二维码后回车"
-                  size="small" class="barcode-input-inline"
-                  @keyup.enter="addOutBarcode(row)"
-                  @blur="addOutBarcode(row)" />
-              </div>
+              <el-input-number v-model="row._confirmQty" :min="0" :max="(row.planQty || 0) - (row.actualQty || 0)"
+                size="small" controls-position="right" style="width: 140px" />
             </template>
           </el-table-column>
         </el-table>
         <template #footer>
           <div class="dialog-footer">
-            <span class="footer-tip">请逐行扫描或输入出库二维码，系统将校验 FIFO 规则。</span>
+            <span class="footer-tip">请确认后输入实际出库数量，默认与计划数一致，系统将自动按 FIFO 执行。</span>
             <div>
               <el-button @click="outConfirmVisible = false">取消</el-button>
               <el-button type="primary" :loading="outConfirmSubmitting" @click="handleOutConfirmSubmit">
@@ -1462,12 +1436,10 @@ async function openOutConfirmDialog(row) {
   outConfirmSubmitting.value = false
   try {
     const data = await getOutboundDetail(row.id)
-    // 为每行添加 _confirmQty 和 _barcodes / _barcodeInput 字段
+    // 为每行添加 _confirmQty 字段，默认等于待出数量
     outConfirmDetails.value = (data.details || []).map(d => ({
       ...d,
-      _confirmQty: Math.max(0, (d.planQty || 0) - (d.actualQty || 0)),
-      _barcodes: [],
-      _barcodeInput: ''
+      _confirmQty: Math.max(0, (d.planQty || 0) - (d.actualQty || 0))
     }))
   } catch {
     outConfirmDetails.value = []
@@ -1479,31 +1451,15 @@ async function openOutConfirmDialog(row) {
  * 将二维码输入框中的值添加为二维码标签。
  * 支持扫码枪回车输入和手动粘贴（按逗号/空格/换行分割）。
  */
-function addOutBarcode(row) {
-  const raw = (row._barcodeInput || '').trim()
-  if (!raw) return
-  // 支持逗号、空格、换行作为分隔符，适配批量粘贴
-  const parts = raw.split(/[,，\s\n\r]+/).filter(Boolean)
-  if (!row._barcodes) row._barcodes = []
-  for (const part of parts) {
-    if (!row._barcodes.includes(part)) {
-      row._barcodes.push(part)
-    }
-  }
-  row._barcodeInput = ''
-}
-
-function removeOutBarcode(row, idx) {
-  row._barcodes.splice(idx, 1)
-}
-
 async function handleOutConfirmSubmit() {
-  // 校验：每条明细的二维码折算数量应与本次出库数一致
-  for (const row of outConfirmDetails.value) {
-    if (row._confirmQty > 0 && (!row._barcodes || row._barcodes.length === 0)) {
-      ElMessage.warning(`物料 ${row.materialCode} 本次出库数大于 0，请扫描或输入二维码`)
-      return
-    }
+  const invalid = outConfirmDetails.value.find(d => d._confirmQty < 0)
+  if (invalid) {
+    ElMessage.warning('出库数量不能小于 0')
+    return
+  }
+  if (!outConfirmDetails.value.some(d => d._confirmQty > 0)) {
+    ElMessage.warning('请至少填写一条明细的本次出库数')
+    return
   }
 
   outConfirmSubmitting.value = true
@@ -1512,20 +1468,14 @@ async function handleOutConfirmSubmit() {
       .filter(d => d._confirmQty > 0)
       .map(d => ({
         detailId: d.id,
-        actualQty: d._confirmQty,
-        barcodes: d._barcodes || []
+        actualQty: d._confirmQty
       }))
-    if (details.length === 0) {
-      ElMessage.warning('请至少填写一条明细的本次出库数')
-      outConfirmSubmitting.value = false
-      return
-    }
     await confirmOutbound(outConfirmTarget.value.id, { details })
     ElMessage.success('出库确认成功')
     outConfirmVisible.value = false
     loadOutboundOrders()
   } catch (err) {
-    ElMessage.error(err.message || '出库确认失败，请检查二维码是否正确且符合先进先出规则')
+    ElMessage.error(err.message || '出库确认失败')
   } finally {
     outConfirmSubmitting.value = false
   }
@@ -1868,43 +1818,6 @@ async function loadHistories() {
 }
 .supplier-pick-group :deep(.el-select__wrapper) {
   min-width: 180px;
-}
-/* ==================== 出库二维码输入区 ==================== */
-.barcode-tag-area {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  min-height: 32px;
-  padding: 4px 6px;
-  border: 1px solid var(--border-light);
-  border-radius: 4px;
-  background: #fafafa;
-}
-
-.barcode-tag-area:focus-within {
-  border-color: var(--wms-primary);
-  background: #fff;
-}
-.barcode-tag {
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.barcode-input-inline {
-  flex: 1;
-  min-width: 120px;
-}
-.barcode-input-inline :deep(.el-input__wrapper) {
-  border: none;
-  box-shadow: none;
-  background: transparent;
-  padding: 0 4px;
-}
-.barcode-input-inline :deep(.el-input__wrapper:hover),
-.barcode-input-inline :deep(.el-input__wrapper.is-focus) {
-  box-shadow: none;
 }
 </style>
 
