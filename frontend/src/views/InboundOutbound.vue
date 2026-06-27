@@ -557,7 +557,7 @@
     <!-- 入库流水查询对话框 -->
     <Teleport to="body">
       <el-dialog v-model="inboundFlowVisible" title="入库流水查询"
-        width="min(900px, calc(100vw - 32px))" destroy-on-close>
+        width="min(900px, calc(100vw - 32px))" @opened="loadInboundFlow">
         <div class="toolbar" style="margin-bottom: 12px">
           <el-input v-model="inboundFlowOrderNo" placeholder="入库单号（模糊）" clearable
             size="small" style="width: 180px" @keyup.enter="loadInboundFlow" />
@@ -600,7 +600,7 @@
     <!-- 出库流水查询对话框 (Teleport to body) -->
     <Teleport to="body">
       <el-dialog v-model="historyVisible" title="出库批次流水查询"
-        width="min(900px, calc(100vw - 32px))" destroy-on-close>
+        width="min(900px, calc(100vw - 32px))" @opened="loadHistories">
         <div class="toolbar" style="margin-bottom: 12px">
           <el-input v-model="historyOrderNo" placeholder="出库单号（模糊）" clearable
             size="small" style="width: 180px" @keyup.enter="loadHistories" />
