@@ -575,25 +575,19 @@
         <el-table :data="inboundFlowList" stripe size="small" v-loading="inboundFlowLoading"
           empty-text="暂无入库流水记录">
           <el-table-column label="入库单号" width="200" show-overflow-tooltip>
-            <template #default="{ row }">
-              {{ getInboundOrderNo(row.inboundId) }}
-            </template>
+            <template #default="{ row }">{{ getInboundOrderNo(row.inboundId) }}</template>
           </el-table-column>
           <el-table-column prop="materialCode" label="物料号" width="130" />
           <el-table-column prop="barcode" label="看板号" min-width="260" show-overflow-tooltip />
           <el-table-column prop="status" label="状态" width="90" align="center">
             <template #default="{ row }">
-              <span class="badge" :class="row.status === '在库' ? 'badge-success' : row.status === '已出库' ? 'badge-default' : 'badge-warn'">
-                {{ row.status }}
-              </span>
+              <span class="badge" :class="row.status === '在库' ? 'badge-success' : row.status === '已出库' ? 'badge-default' : 'badge-warn'">{{ row.status }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="remainingQty" label="剩余数量" width="90" align="right" />
           <el-table-column prop="createdAt" label="生成时间" width="170" show-overflow-tooltip />
         </el-table>
-        <template #footer>
-          <el-button @click="inboundFlowVisible = false">关闭</el-button>
-        </template>
+        <template #footer><el-button @click="inboundFlowVisible = false">关闭</el-button></template>
       </el-dialog>
     </Teleport>
 
@@ -1530,7 +1524,7 @@ function openInboundFlowDialog() {
 }
 
 async function loadInboundFlow() {
-  console.log('[loadInboundFlow] 触发, orderNo=' + inboundFlowOrderNo.value + ' materialCode=' + inboundFlowMaterial.value)
+  ElMessage.info('入库流水查询中...')
   inboundFlowLoading.value = true
   try {
     const params = { page: 1, size: 200 }
@@ -1538,31 +1532,17 @@ async function loadInboundFlow() {
     const mc = inboundFlowMaterial.value?.trim()
     if (on) params.orderNo = on
     if (mc) params.materialCode = mc
-    console.log('[loadInboundFlow] 请求参数:', JSON.stringify(params))
     const data = await getInboundFlow(params)
-    console.log('[loadInboundFlow] 响应:', data.records?.length + '条记录')
     inboundFlowList.value = data.records || []
-    // 构建 inboundId → 单号缓存
     const ids = [...new Set(inboundFlowList.value.map(r => r.inboundId).filter(Boolean))]
     for (const id of ids) {
       if (!inboundOrderNoMap.value[id]) {
-        try {
-          const detail = await getInboundDetail(id)
-          inboundOrderNoMap.value[id] = detail.orderNo
-        } catch { inboundOrderNoMap.value[id] = '—' }
+        try { const d = await getInboundDetail(id); inboundOrderNoMap.value[id] = d.orderNo } catch { inboundOrderNoMap.value[id] = '—' }
       }
     }
-  } catch (err) {
-    inboundFlowList.value = []
-    ElMessage.error('查询失败: ' + (err?.message || '未知错误'))
-  } finally {
-    inboundFlowLoading.value = false
-  }
+  } catch { inboundFlowList.value = [] } finally { inboundFlowLoading.value = false }
 }
-
-function getInboundOrderNo(inboundId) {
-  return inboundOrderNoMap.value[inboundId] || '加载中...'
-}
+function getInboundOrderNo(inboundId) { return inboundOrderNoMap.value[inboundId] || '加载中...' }
 
 // ==================== 出库流水查询 ====================
 const historyVisible = ref(false)
