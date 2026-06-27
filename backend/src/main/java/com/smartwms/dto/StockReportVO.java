@@ -26,6 +26,10 @@ public class StockReportVO {
     private LocalDateTime lastOutboundDate;
     /** 闲置天数（自最后出库至今） */
     private Integer idleDays;
+    /** 算法推荐安全库存量（基于历史需求波动计算） */
+    private Integer suggestedSafetyStock;
+    /** 算法推荐补货提前期（基于历史入库间隔计算） */
+    private Integer suggestedLeadTimeDays;
     private LocalDateTime updatedAt;
 
     // ==================== Getters / Setters ====================
@@ -65,6 +69,12 @@ public class StockReportVO {
 
     public Integer getIdleDays() { return idleDays; }
     public void setIdleDays(Integer idleDays) { this.idleDays = idleDays; }
+
+    public Integer getSuggestedSafetyStock() { return suggestedSafetyStock; }
+    public void setSuggestedSafetyStock(Integer suggestedSafetyStock) { this.suggestedSafetyStock = suggestedSafetyStock; }
+
+    public Integer getSuggestedLeadTimeDays() { return suggestedLeadTimeDays; }
+    public void setSuggestedLeadTimeDays(Integer suggestedLeadTimeDays) { this.suggestedLeadTimeDays = suggestedLeadTimeDays; }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }

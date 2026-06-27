@@ -13,20 +13,26 @@ package com.smartwms.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.smartwms.dto.StockReportVO;
 import com.smartwms.entity.Barcode;
+import com.smartwms.entity.InboundDetail;
+import com.smartwms.entity.InboundOrder;
 import com.smartwms.entity.Inventory;
 import com.smartwms.entity.Material;
 import com.smartwms.entity.OutboundHistory;
 import com.smartwms.mapper.BarcodeMapper;
+import com.smartwms.mapper.InboundDetailMapper;
+import com.smartwms.mapper.InboundOrderMapper;
 import com.smartwms.mapper.InventoryMapper;
 import com.smartwms.mapper.MaterialMapper;
 import com.smartwms.mapper.OutboundHistoryMapper;
 import com.smartwms.service.StockService;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class StockServiceImpl implements StockService {
@@ -38,15 +44,21 @@ public class StockServiceImpl implements StockService {
     private final MaterialMapper materialMapper;
     private final OutboundHistoryMapper outboundHistoryMapper;
     private final BarcodeMapper barcodeMapper;
+    private final InboundOrderMapper inboundOrderMapper;
+    private final InboundDetailMapper inboundDetailMapper;
 
     public StockServiceImpl(InventoryMapper inventoryMapper,
                             MaterialMapper materialMapper,
                             OutboundHistoryMapper outboundHistoryMapper,
-                            BarcodeMapper barcodeMapper) {
+                            BarcodeMapper barcodeMapper,
+                            InboundOrderMapper inboundOrderMapper,
+                            InboundDetailMapper inboundDetailMapper) {
         this.inventoryMapper = inventoryMapper;
         this.materialMapper = materialMapper;
         this.outboundHistoryMapper = outboundHistoryMapper;
         this.barcodeMapper = barcodeMapper;
+        this.inboundOrderMapper = inboundOrderMapper;
+        this.inboundDetailMapper = inboundDetailMapper;
     }
 
     @Override
@@ -126,9 +138,14 @@ public class StockServiceImpl implements StockService {
         if (dailyConsume > 0) {
             vo.setDohf((double) qty / dailyConsume);
         } else {
-            // 无消耗时 DOHF 视为极大值（仅在非呆滞时用于高储判定）
             vo.setDohf(qty > 0 ? 9999.0 : 0.0);
         }
+
+        // 算法推荐值：基于历史数据计算安全库存和提前期
+        int computedLeadTime = computeSuggestedLeadTime(inv.getMaterialCode(), leadTimeDays);
+        int computedSafetyStock = computeSuggestedSafetyStock(inv.getMaterialCode(), dailyConsume, computedLeadTime);
+        vo.setSuggestedLeadTimeDays(computedLeadTime);
+        vo.setSuggestedSafetyStock(computedSafetyStock);
 
         // ==================== 四级评级逻辑 ====================
         // 优先级：库存为0 → 呆滞 → 低储 → 高储 → 正常
@@ -240,7 +257,92 @@ public class StockServiceImpl implements StockService {
         if (evaluation.equals(filter)) {
             return true;
         }
-        // 兼容前端用 "LOW" 筛选低储
         return "LOW".equals(filter) && "LOW_STOCK".equals(evaluation);
     }
+
+    /**
+     * 基于历史入库间隔计算建议提前期。
+     * 统计最近 5 次确认入库的平均间隔天数，若数据不足则保留手动配置值。
+     *
+     * @return 建议的提前期天数
+     */
+    private int computeSuggestedLeadTime(String materialCode, int manualDays) {
+        List<InboundOrder> confirmedOrders = inboundOrderMapper.selectList(
+            new LambdaQueryWrapper<InboundOrder>()
+                .eq(InboundOrder::getStatus, "已完成")
+                .orderByDesc(InboundOrder::getCreatedAt)
+                .last("LIMIT 10")
+        );
+        // 筛选包含该物料的订单并按时间排序
+        List<LocalDateTime> inboundTimes = new ArrayList<>();
+        for (InboundOrder o : confirmedOrders) {
+            Long count = inboundDetailMapper.selectCount(
+                new LambdaQueryWrapper<InboundDetail>()
+                    .eq(InboundDetail::getInboundId, o.getId())
+                    .eq(InboundDetail::getMaterialCode, materialCode));
+            if (count > 0 && o.getCreatedAt() != null) {
+                inboundTimes.add(o.getCreatedAt());
+            }
+        }
+        if (inboundTimes.size() < 2) return manualDays;
+        // 按时间升序排列
+        inboundTimes.sort(LocalDateTime::compareTo);
+        // 计算平均补货间隔
+        long totalDays = 0;
+        for (int i = 1; i < inboundTimes.size(); i++) {
+            totalDays += ChronoUnit.DAYS.between(inboundTimes.get(i - 1), inboundTimes.get(i));
+        }
+        int avgInterval = (int) (totalDays / (inboundTimes.size() - 1));
+        return Math.max(1, avgInterval);
+    }
+
+    /**
+     * 基于历史需求波动计算建议安全库存。
+     * 使用经典公式：Z × σ_daily × √leadTimeDays
+     * Z=1.65（95%服务水平），σ_daily 为近 30 天日出库量的标准差。
+     *
+     * @param dailyConsume   近 30 天日均消耗
+     * @param leadTimeDays   补货提前期天数
+     * @return 建议的安全库存量（向上取整）
+     */
+    private int computeSuggestedSafetyStock(String materialCode, double dailyConsume, int leadTimeDays) {
+        if (dailyConsume <= 0) return 0;
+        // 查询近 30 天每日出库量
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        List<OutboundHistory> histories = outboundHistoryMapper.selectList(
+            new LambdaQueryWrapper<OutboundHistory>()
+                .eq(OutboundHistory::getMaterialCode, materialCode)
+                .ge(OutboundHistory::getCreatedAt, thirtyDaysAgo)
+        );
+        if (histories.size() < 5) {
+            // 数据不足时用日均 × 3 天的经验值兜底
+            return (int) Math.ceil(dailyConsume * 3);
+        }
+        // 按日期分组汇总日消耗
+        Map<LocalDate, Integer> dailyMap = new java.util.LinkedHashMap<>();
+        for (OutboundHistory h : histories) {
+            LocalDate d = h.getCreatedAt().toLocalDate();
+            dailyMap.merge(d, h.getDeductQty() != null ? h.getDeductQty() : 0, Integer::sum);
+        }
+        // 填充无出库日为 0
+        java.time.LocalDate cursor = thirtyDaysAgo.toLocalDate();
+        java.time.LocalDate today = java.time.LocalDate.now();
+        List<Integer> dailyValues = new ArrayList<>();
+        while (!cursor.isAfter(today)) {
+            dailyValues.add(dailyMap.getOrDefault(cursor, 0));
+            cursor = cursor.plusDays(1);
+        }
+        // 计算标准差 σ
+        int n = dailyValues.size();
+        double mean = dailyValues.stream().mapToInt(Integer::intValue).average().orElse(0);
+        double variance = dailyValues.stream()
+            .mapToDouble(v -> (v - mean) * (v - mean))
+            .sum() / n;
+        double sigma = Math.sqrt(variance);
+        // Z × σ × √LT
+        double z = 1.65; // 95% service level
+        int safety = (int) Math.ceil(z * sigma * Math.sqrt(Math.max(1, leadTimeDays)));
+        return Math.max(0, safety);
+    }
+
 }
