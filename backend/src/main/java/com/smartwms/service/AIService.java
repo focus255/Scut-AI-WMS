@@ -88,6 +88,10 @@ public class AIService {
      */
     private JsonNode extractJson(String content) {
         String text = content.trim();
+        if (text.isEmpty()) {
+            log.warn("[AI-API] 响应内容为空");
+            return null;
+        }
 
         // 策略1: 纯 JSON 直接解析
         if (text.startsWith("{")) {
@@ -101,22 +105,41 @@ public class AIService {
             int codeStart = text.indexOf("\n", jsonStart);
             int codeEnd = text.indexOf("```", codeStart > 0 ? codeStart : jsonStart + 3);
             if (codeStart > 0 && codeEnd > codeStart) {
+                String inner = text.substring(codeStart, codeEnd).trim();
                 try {
-                    return objectMapper.readTree(text.substring(codeStart, codeEnd).trim());
+                    return objectMapper.readTree(inner);
                 } catch (Exception ignored) {}
             }
         }
 
-        // 策略3: 查找第一个 { 到最后一个 }
+        // 策略3: 查找第一个 { 到最后一个 }（处理带前缀文本的 JSON）
         int firstBrace = text.indexOf('{');
         int lastBrace = text.lastIndexOf('}');
         if (firstBrace >= 0 && lastBrace > firstBrace) {
+            String candidate = text.substring(firstBrace, lastBrace + 1);
             try {
-                return objectMapper.readTree(text.substring(firstBrace, lastBrace + 1));
+                return objectMapper.readTree(candidate);
             } catch (Exception ignored) {}
         }
 
-        log.warn("[AI-API] JSON 解析失败，响应前200字: {}", text.substring(0, Math.min(200, text.length())));
+        // 策略4: 处理 DeepSeek think 块后的 JSON
+        int thinkEnd = text.indexOf("<｜end▁of▁thinking｜>");
+        if (thinkEnd < 0) thinkEnd = text.indexOf("\n\n", text.indexOf("<｜end▁of▁thinking｜>") > 0 ? text.indexOf(" response") : 0);
+        if (thinkEnd > 0) {
+            String afterThink = text.substring(thinkEnd).trim();
+            try {
+                return objectMapper.readTree(afterThink);
+            } catch (Exception ignored) {
+                // 可能还有前缀，尝试找 {
+                int b2 = afterThink.indexOf('{');
+                if (b2 >= 0) {
+                    try { return objectMapper.readTree(afterThink.substring(b2)); }
+                    catch (Exception ignored2) {}
+                }
+            }
+        }
+
+        log.warn("[AI-API] JSON解析失败，响应前300字: {}", text.substring(0, Math.min(300, text.length())));
         return null;
     }
 

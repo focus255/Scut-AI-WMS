@@ -71,9 +71,17 @@ public class DemandForecastService {
 
         boolean aiSuccess = false;
         if (aiService.isConfigured()) {
-            JsonNode result = aiService.chat(
-                "你是供应链需求预测专家。根据出入库历史数据预测未来4周。只返回JSON。",
-                buildPrompt(materialCode, outWeeks, inWeeks));
+            JsonNode result = null;
+            // 最多重试 3 次
+            for (int attempt = 0; attempt < 3 && result == null; attempt++) {
+                if (attempt > 0) {
+                    log.info("物料 {} 第 {} 次重试 AI 预测...", materialCode, attempt + 1);
+                    try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+                }
+                result = aiService.chat(
+                    "你是供应链需求预测专家。根据出入库历史数据预测未来4周。只返回JSON。",
+                    buildPrompt(materialCode, outWeeks, inWeeks));
+            }
             if (result != null) {
                 outPred[0] = result.path("outWeek1").asInt(outWeeks[11]);
                 outPred[1] = result.path("outWeek2").asInt(outWeeks[11]);
@@ -88,13 +96,13 @@ public class DemandForecastService {
                 aiSuccess = true;
             }
         }
-        // AI 未配置或 AI 返回 null 时，使用本地统计回退
+        // AI 未配置时使用本地统计
         if (!aiSuccess) {
             double outAvg = Arrays.stream(outWeeks).average().orElse(0);
             double inAvg = inWeeks.length > 0 ? Arrays.stream(inWeeks).average().orElse(0) : outAvg;
             for (int i = 0; i < PREDICT_WEEKS; i++) { outPred[i] = (int) Math.round(outAvg); inPred[i] = (int) Math.round(inAvg); }
             analysis = buildLocalAnalysis(outWeeks, trend, volatility, anomaly);
-            model = "本地统计" + (aiService.isConfigured() ? "（AI回退）" : "");
+            model = aiService.isConfigured() ? "AI调用失败-已重试3次" : "本地统计（未配置AI）";
         }
 
         // 4. 存储
