@@ -93,6 +93,40 @@ public class InboundServiceImpl implements InboundService {
         return appliance.getPackCapacity();
     }
 
+    /** 物料+供应商 → 全局累加箱序号缓存（应用生命周期内不重置） */
+    private static final java.util.concurrent.ConcurrentHashMap<String, AtomicInteger> BOX_SEQ_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * 获取物料+供应商的下一个全局箱序号。
+     * 首次访问时从数据库查询当前最大值 + 1，后续在内存中递增。
+     */
+    private int getNextBoxSeq(String materialCode, String supplierCode) {
+        String key = materialCode + "|" + supplierCode;
+        AtomicInteger counter = BOX_SEQ_CACHE.computeIfAbsent(key, k -> {
+            // 从数据库查询该物料+供应商的当前最大箱序号
+            int maxSeq = 0;
+            List<Barcode> existing = barcodeMapper.selectList(
+                new LambdaQueryWrapper<Barcode>()
+                    .eq(Barcode::getMaterialCode, materialCode)
+                    .eq(Barcode::getSupplierCode, supplierCode)
+                    .orderByDesc(Barcode::getBarcode)
+                    .last("LIMIT 1")
+            );
+            if (!existing.isEmpty()) {
+                String barcode = existing.get(0).getBarcode();
+                if (barcode != null) {
+                    String[] parts = barcode.split("\\|");
+                    if (parts.length >= 7) {
+                        try { maxSeq = Integer.parseInt(parts[6].replaceAll("[^0-9]", "")); }
+                        catch (NumberFormatException ignored) { }
+                    }
+                }
+            }
+            return new AtomicInteger(maxSeq);
+        });
+        return counter.incrementAndGet();
+    }
+
     /**
      * 从数据库查询当天已有订单号的最大序号，初始化计数器。
      * 避免应用重启后 ORDER_SEQ 从 0 开始导致订单号重复。
@@ -168,7 +202,9 @@ public class InboundServiceImpl implements InboundService {
             inboundDetailMapper.insert(detail);
 
             // 每箱生成一条二维码，前 N-1 箱为整箱，末箱可能为零头
+            // 箱序号基于物料+供应商全局累加，不从1开始，避免不同订单重复
             for (int i = 0; i < boxCount; i++) {
+                int globalBoxSeq = getNextBoxSeq(item.getMaterialCode(), supplierCode);
                 boolean isLastBox = (i == boxCount - 1);
                 // 末箱件数 = planQty - 前 N-1 箱的整箱总量，若为零则回退到整箱容量（恰好整除时）
                 int boxQty = isLastBox
@@ -177,7 +213,7 @@ public class InboundServiceImpl implements InboundService {
                 if (boxQty <= 0) boxQty = packCapacity; // 整除时末箱也是整箱
 
                 String barcodeStr = buildBarcode(item.getMaterialCode(), supplierCode,
-                        planQty, packCapacity, boxQty, i + 1);
+                        planQty, packCapacity, boxQty, globalBoxSeq);
                 Barcode barcode = new Barcode();
                 barcode.setMaterialCode(item.getMaterialCode());
                 barcode.setSupplierCode(supplierCode);
@@ -358,6 +394,7 @@ public class InboundServiceImpl implements InboundService {
             inboundDetailMapper.insert(detail);
 
             for (int i = 0; i < boxCount; i++) {
+                int globalBoxSeq = getNextBoxSeq(item.getMaterialCode(), supplierCode);
                 boolean isLastBox = (i == boxCount - 1);
                 int boxQty = isLastBox
                         ? planQty - (boxCount - 1) * packCapacity
@@ -365,7 +402,7 @@ public class InboundServiceImpl implements InboundService {
                 if (boxQty <= 0) boxQty = packCapacity;
 
                 String barcodeStr = buildBarcode(item.getMaterialCode(), supplierCode,
-                        planQty, packCapacity, boxQty, i + 1);
+                        planQty, packCapacity, boxQty, globalBoxSeq);
                 Barcode barcode = new Barcode();
                 barcode.setMaterialCode(item.getMaterialCode());
                 barcode.setSupplierCode(supplierCode);
