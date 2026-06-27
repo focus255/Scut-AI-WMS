@@ -108,9 +108,10 @@ public class OutboundServiceImpl implements OutboundService {
         int maxSeq = 0;
         for (OutboundOrder o : todayOrders) {
             String no = o.getOrderNo();
-            if (no != null && no.length() >= likePrefix.length()) {
+            // 标准格式 CK + 8位日期 + 5位序号 = 15字符，只取最后5位
+            if (no != null && no.length() >= 15) {
                 try {
-                    int s = Integer.parseInt(no.substring(likePrefix.length()));
+                    int s = Integer.parseInt(no.substring(no.length() - 5));
                     if (s > maxSeq) maxSeq = s;
                 } catch (NumberFormatException ignored) { }
             }

@@ -61,163 +61,181 @@ public class AdminController {
     }
 
     /**
-     * 诊断：查询所有 8 段格式的条码及其关联数据。
+     * 诊断：全面检查条码、入库单号、出库单号格式是否符合规范。
      * GET /api/admin/diagnose-barcodes
+     *
+     * 规范：
+     *   条码:   WMS|物料|供应商|计划数|箱容量|实收数|箱序号 (7段，箱序号无前导零)
+     *   入库单: RK + yyyyMMdd + 4位序号 (共14字符)
+     *   出库单: CK + yyyyMMdd + 5位序号 (共15字符)
      */
     @GetMapping("/diagnose-barcodes")
     public Result<Map<String, Object>> diagnoseBarcodes() {
-        List<Barcode> all = barcodeMapper.selectList(null);
-        List<String> bad8Seg = new ArrayList<>();
-        List<String> oldSplit = new ArrayList<>();
+        List<Barcode> allBarcodes = barcodeMapper.selectList(null);
+        List<String> badBarcodes = new ArrayList<>();
+        List<String> badInboundOrders = new ArrayList<>();
+        List<String> badOutboundOrders = new ArrayList<>();
         Set<Long> badBarcodeIds = new HashSet<>();
         Set<Long> badInboundIds = new HashSet<>();
 
-        for (Barcode bc : all) {
+        // 条码规范：7段（6个|），箱序号不含前导零
+        for (Barcode bc : allBarcodes) {
             String b = bc.getBarcode();
             if (b == null) continue;
-            // 8 段格式：含 8 个 | 分隔的段（WMS|...|...|...|...|...|...|...）
             int pipes = b.length() - b.replace("|", "").length();
-            if (pipes >= 7) {
-                bad8Seg.add(b);
+            boolean isBad = false;
+            // 不是正好6个| = 不是7段
+            if (pipes != 6) isBad = true;
+            // 箱序号含非法字符（如 0001-3 范围格式，或非数字非_S后缀）
+            if (!isBad && b.matches(".*\\|.*[-].*$")) isBad = true;     // 范围格式 0001-3
+            if (!isBad && !b.matches(".*\\|[0-9]+(_S[0-9]+)?$")) isBad = true;
+            if (isBad) {
+                badBarcodes.add(b);
                 badBarcodeIds.add(bc.getId());
                 badInboundIds.add(bc.getInboundId());
             }
-            // 旧拆分格式：_S 不在最后一段内
-            if (b.contains("_S") && !b.matches(".*\\|[^|]*_S[^|]*$")) {
-                oldSplit.add(b);
-                badBarcodeIds.add(bc.getId());
-                badInboundIds.add(bc.getInboundId());
+        }
+
+        // 入库单号规范：RK + 8位日期 + 4位序号 = 14字符
+        List<InboundOrder> inOrders = inboundOrderMapper.selectList(null);
+        for (InboundOrder o : inOrders) {
+            String no = o.getOrderNo();
+            if (no == null) continue;
+            if (!no.matches("^RK\\d{12}$")) {
+                badInboundOrders.add(no);
+                badInboundIds.add(o.getId());
+            }
+        }
+
+        // 出库单号规范：CK + 8位日期 + 5位序号 = 15字符
+        List<OutboundOrder> outOrders = outboundOrderMapper.selectList(null);
+        Set<Long> badOutboundIds = new HashSet<>();
+        for (OutboundOrder o : outOrders) {
+            String no = o.getOrderNo();
+            if (no == null) continue;
+            if (!no.matches("^CK\\d{13}$")) {
+                badOutboundOrders.add(no);
+                badOutboundIds.add(o.getId());
             }
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("totalBarcodes", all.size());
-        result.put("bad8SegmentCount", bad8Seg.size());
-        result.put("bad8SegmentBarcodes", bad8Seg);
-        result.put("oldSplitCount", oldSplit.size());
-        result.put("oldSplitBarcodes", oldSplit);
-        result.put("affectedBarcodeIds", badBarcodeIds.size());
-        result.put("affectedInboundIds", badInboundIds.size());
+        result.put("totalBarcodes", allBarcodes.size());
+        result.put("badBarcodeCount", badBarcodes.size());
+        result.put("badBarcodes", badBarcodes);
+        result.put("badInboundOrderCount", badInboundOrders.size());
+        result.put("badInboundOrders", badInboundOrders);
+        result.put("badOutboundOrderCount", badOutboundOrders.size());
+        result.put("badOutboundOrders", badOutboundOrders);
 
-        // 统计关联数据
-        if (!badBarcodeIds.isEmpty()) {
-            Long freezeCount = inventoryFreezeMapper.selectCount(
-                new LambdaQueryWrapper<InventoryFreeze>().in(InventoryFreeze::getBarcodeId, badBarcodeIds));
-            Long historyCount = outboundHistoryMapper.selectCount(
-                new LambdaQueryWrapper<OutboundHistory>().in(OutboundHistory::getBarcodeId, badBarcodeIds));
-            result.put("relatedFreezes", freezeCount);
-            result.put("relatedOutboundHistories", historyCount);
-        }
-
-        log.info("[管理诊断] 8段条码={} 个, 旧拆分={} 个, 涉及入库单={} 个",
-            bad8Seg.size(), oldSplit.size(), badInboundIds.size());
+        log.info("[管理诊断] 违规条码={} 违规入库单={} 违规出库单={}",
+            badBarcodes.size(), badInboundOrders.size(), badOutboundOrders.size());
         return Result.success(result);
     }
 
     /**
-     * 清理：删除所有 8 段格式和旧拆分格式的条码及其关联数据。
+     * 清理：删除所有格式违规的条码、入库单、出库单及其关联数据。
      * DELETE /api/admin/cleanup-barcodes
-     *
-     * 删除顺序（遵守外键依赖）：
-     *   出库流水 → 出库明细 → 出库单 → 封存记录 → 条码 → 入库明细 → 入库单
      */
     @DeleteMapping("/cleanup-barcodes")
     @Transactional(rollbackFor = Exception.class)
     public Result<Map<String, Object>> cleanupBarcodes() {
-        // 1. 收集所有异常条码
-        List<Barcode> allBarcodes = barcodeMapper.selectList(null);
         Set<Long> badBarcodeIds = new HashSet<>();
         Set<Long> badInboundIds = new HashSet<>();
         Set<Long> badOutboundIds = new HashSet<>();
-        int bad8Count = 0, oldSplitCount = 0;
+        int badBarcodeCount = 0, badInOrderCount = 0, badOutOrderCount = 0;
 
+        // 1. 收集违规条码（非7段 或 箱序号含前导零/非法字符）
+        List<Barcode> allBarcodes = barcodeMapper.selectList(null);
         for (Barcode bc : allBarcodes) {
             String b = bc.getBarcode();
             if (b == null) continue;
-            boolean isBad = false;
             int pipes = b.length() - b.replace("|", "").length();
-            if (pipes >= 7) { bad8Count++; isBad = true; }
-            if (b.contains("_S") && !b.matches(".*\\|[^|]*_S[^|]*$")) { oldSplitCount++; isBad = true; }
+            boolean isBad = (pipes != 6);
+            if (!isBad && b.matches(".*\\|.*[-].*$")) isBad = true;     // 范围格式 0001-3
+            if (!isBad && !b.matches(".*\\|[0-9]+(_S[0-9]+)?$")) isBad = true; // 箱序号非数字非_S
             if (isBad) {
+                badBarcodeCount++;
                 badBarcodeIds.add(bc.getId());
                 badInboundIds.add(bc.getInboundId());
             }
         }
 
-        if (badBarcodeIds.isEmpty()) {
-            return Result.success(Map.of("message", "无异常条码，无需清理"));
-        }
-
-        // 2. 收集涉及的出库单 ID
-        if (!badBarcodeIds.isEmpty()) {
-            List<OutboundHistory> histories = outboundHistoryMapper.selectList(
-                new LambdaQueryWrapper<OutboundHistory>().in(OutboundHistory::getBarcodeId, badBarcodeIds));
-            for (OutboundHistory h : histories) {
-                badOutboundIds.add(h.getOutboundId());
+        // 2. 收集违规入库单（非 RK + 12 位数字）
+        List<InboundOrder> inOrders = inboundOrderMapper.selectList(null);
+        for (InboundOrder o : inOrders) {
+            String no = o.getOrderNo();
+            if (no != null && !no.matches("^RK\\d{12}$")) {
+                badInOrderCount++;
+                badInboundIds.add(o.getId());
             }
         }
 
-        // 3. 按外键依赖顺序删除
-        int deletedHistories = 0, deletedOutDetails = 0, deletedOutOrders = 0;
-        int deletedFreezes = 0, deletedBarcodes = 0, deletedInDetails = 0, deletedInOrders = 0;
+        // 3. 收集违规出库单（非 CK + 13 位数字）
+        List<OutboundOrder> outOrders = outboundOrderMapper.selectList(null);
+        for (OutboundOrder o : outOrders) {
+            String no = o.getOrderNo();
+            if (no != null && !no.matches("^CK\\d{13}$")) {
+                badOutOrderCount++;
+                badOutboundIds.add(o.getId());
+            }
+        }
 
-        // 3a. 出库流水
+        if (badBarcodeIds.isEmpty() && badInboundIds.isEmpty() && badOutboundIds.isEmpty()) {
+            return Result.success(Map.of("message", "无异常数据，无需清理"));
+        }
+
+        // 4. 收集涉及的出库单（通过条码关联的流水）
         if (!badBarcodeIds.isEmpty()) {
-            deletedHistories = outboundHistoryMapper.delete(
+            List<OutboundHistory> histories = outboundHistoryMapper.selectList(
                 new LambdaQueryWrapper<OutboundHistory>().in(OutboundHistory::getBarcodeId, badBarcodeIds));
+            for (OutboundHistory h : histories) badOutboundIds.add(h.getOutboundId());
         }
 
-        // 3b. 出库明细 + 出库单
+        int delHistories = 0, delOutDetails = 0, delOutOrders = 0;
+        int delFreezes = 0, delBarcodes = 0, delInDetails = 0, delInOrders = 0;
+
+        // 出库流水
+        if (!badBarcodeIds.isEmpty()) delHistories = outboundHistoryMapper.delete(
+            new LambdaQueryWrapper<OutboundHistory>().in(OutboundHistory::getBarcodeId, badBarcodeIds));
+        // 出库明细 + 出库单
         if (!badOutboundIds.isEmpty()) {
-            deletedOutDetails = outboundDetailMapper.delete(
+            delOutDetails = outboundDetailMapper.delete(
                 new LambdaQueryWrapper<OutboundDetail>().in(OutboundDetail::getOutboundId, badOutboundIds));
-            deletedOutOrders = outboundOrderMapper.deleteBatchIds(badOutboundIds);
+            delOutOrders = outboundOrderMapper.deleteBatchIds(badOutboundIds);
         }
-
-        // 3c. 封存记录
-        if (!badBarcodeIds.isEmpty()) {
-            deletedFreezes = inventoryFreezeMapper.delete(
-                new LambdaQueryWrapper<InventoryFreeze>().in(InventoryFreeze::getBarcodeId, badBarcodeIds));
-        }
-
-        // 3d. 条码
-        deletedBarcodes = barcodeMapper.deleteBatchIds(badBarcodeIds);
-
-        // 3e. 入库明细
+        // 封存
+        if (!badBarcodeIds.isEmpty()) delFreezes = inventoryFreezeMapper.delete(
+            new LambdaQueryWrapper<InventoryFreeze>().in(InventoryFreeze::getBarcodeId, badBarcodeIds));
+        // 条码
+        if (!badBarcodeIds.isEmpty()) delBarcodes = barcodeMapper.deleteBatchIds(badBarcodeIds);
+        // 入库明细
+        if (!badInboundIds.isEmpty()) delInDetails = inboundDetailMapper.delete(
+            new LambdaQueryWrapper<InboundDetail>().in(InboundDetail::getInboundId, badInboundIds));
+        // 入库单（仅删除已无明细的）
         if (!badInboundIds.isEmpty()) {
-            deletedInDetails = inboundDetailMapper.delete(
-                new LambdaQueryWrapper<InboundDetail>().in(InboundDetail::getInboundId, badInboundIds));
-        }
-
-        // 3f. 入库单
-        if (!badInboundIds.isEmpty()) {
-            // 再次确认：只删除那些已无关联明细的入库单
-            for (Long inboundId : badInboundIds) {
-                Long remaining = inboundDetailMapper.selectCount(
-                    new LambdaQueryWrapper<InboundDetail>().eq(InboundDetail::getInboundId, inboundId));
-                if (remaining == 0) {
-                    inboundOrderMapper.deleteById(inboundId);
-                    deletedInOrders++;
+            for (Long id : badInboundIds) {
+                if (inboundDetailMapper.selectCount(
+                    new LambdaQueryWrapper<InboundDetail>().eq(InboundDetail::getInboundId, id)) == 0) {
+                    inboundOrderMapper.deleteById(id);
+                    delInOrders++;
                 }
             }
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("message", "清理完成");
-        result.put("bad8SegmentBarcodes", bad8Count);
-        result.put("oldSplitBarcodes", oldSplitCount);
-        result.put("deletedOutboundHistories", deletedHistories);
-        result.put("deletedOutboundDetails", deletedOutDetails);
-        result.put("deletedOutboundOrders", deletedOutOrders);
-        result.put("deletedInventoryFreezes", deletedFreezes);
-        result.put("deletedBarcodes", deletedBarcodes);
-        result.put("deletedInboundDetails", deletedInDetails);
-        result.put("deletedInboundOrders", deletedInOrders);
+        result.put("badBarcodes", badBarcodeCount);
+        result.put("badInboundOrders", badInOrderCount);
+        result.put("badOutboundOrders", badOutOrderCount);
+        result.put("deletedBarcodes", delBarcodes);
+        result.put("deletedInboundOrders", delInOrders);
+        result.put("deletedOutboundOrders", delOutOrders);
+        result.put("deletedFreezes", delFreezes);
+        result.put("deletedHistories", delHistories);
 
-        log.info("[管理清理] 8段条码={} 旧拆分={} | 删除: 流水={} 出库明细={} 出库单={} 封存={} 条码={} 入库明细={} 入库单={}",
-            bad8Count, oldSplitCount, deletedHistories, deletedOutDetails, deletedOutOrders,
-            deletedFreezes, deletedBarcodes, deletedInDetails, deletedInOrders);
-
+        log.info("[管理清理] 条码={} 入库单={} 出库单={} | 删除条码={} 入库={} 出库={}",
+            badBarcodeCount, badInOrderCount, badOutOrderCount, delBarcodes, delInOrders, delOutOrders);
         return Result.success(result);
     }
 }

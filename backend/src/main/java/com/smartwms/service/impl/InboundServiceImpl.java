@@ -98,7 +98,6 @@ public class InboundServiceImpl implements InboundService {
      * 避免应用重启后 ORDER_SEQ 从 0 开始导致订单号重复。
      */
     private void initSeqFromDb(String datePart, String prefix, AtomicInteger seq) {
-        String likePattern = prefix + datePart + "%";
         List<InboundOrder> todayOrders = inboundOrderMapper.selectList(
             new LambdaQueryWrapper<InboundOrder>()
                 .likeRight(InboundOrder::getOrderNo, prefix + datePart)
@@ -106,9 +105,10 @@ public class InboundServiceImpl implements InboundService {
         int maxSeq = 0;
         for (InboundOrder o : todayOrders) {
             String no = o.getOrderNo();
-            if (no != null && no.length() >= prefix.length() + 8) {
+            // 标准格式 RK + 8位日期 + 4位序号 = 14字符，只取最后4位
+            if (no != null && no.length() >= 14) {
                 try {
-                    int s = Integer.parseInt(no.substring(prefix.length() + 8));
+                    int s = Integer.parseInt(no.substring(no.length() - 4));
                     if (s > maxSeq) maxSeq = s;
                 } catch (NumberFormatException ignored) { }
             }
