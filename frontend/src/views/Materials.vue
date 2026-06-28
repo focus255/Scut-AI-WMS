@@ -193,15 +193,9 @@
       <el-dialog v-model="applianceDialogVisible" :title="applianceDialogTitle" width="480px" destroy-on-close>
         <el-form ref="applianceFormRef" :model="applianceForm" :rules="applianceRules" label-width="110px">
           <el-form-item label="物料号" prop="materialCode">
-            <el-select v-model="applianceForm.materialCode" :disabled="!!applianceEditingRow" placeholder="选择已有物料" filterable style="width:100%">
+            <el-select v-model="applianceForm.materialCode" :disabled="!!applianceEditingRow" placeholder="选择已有物料" filterable style="width:100%" @change="onApplianceMaterialChange">
               <el-option v-for="m in allMaterials" :key="m.materialCode"
                 :label="`${m.materialCode} — ${m.materialName}`" :value="m.materialCode" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="供应商编码" prop="supplierCode">
-            <el-select v-model="applianceForm.supplierCode" placeholder="选择已有供应商" filterable style="width:100%">
-              <el-option v-for="s in allSuppliers" :key="s.supplierCode"
-                :label="`${s.supplierName} (${s.supplierCode})`" :value="s.supplierCode" />
             </el-select>
           </el-form-item>
           <el-form-item label="包装器具型号" prop="packType">
@@ -311,8 +305,7 @@ const applianceDeleteTarget = ref(null)
 
 const applianceForm = reactive({ materialCode: '', supplierCode: '', packType: '', packCapacity: 20 })
 const applianceRules = {
-  materialCode: [{ required: true, message: '请输入物料号', trigger: 'blur' }],
-  supplierCode: [{ required: true, message: '请输入供应商编码', trigger: 'blur' }],
+  materialCode: [{ required: true, message: '请选择物料', trigger: 'change' }],
   packType: [{ required: true, message: '请输入包装器具型号', trigger: 'blur' }],
   packCapacity: [{ required: true, message: '请输入单箱容量', trigger: 'blur' }]
 }
@@ -478,6 +471,11 @@ async function loadAppliances(page = 1) {
   } finally {
     applianceLoading.value = false
   }
+}
+
+function onApplianceMaterialChange(code) {
+  const m = allMaterials.value.find(m => m.materialCode === code)
+  applianceForm.supplierCode = m?.supplierCode || ''
 }
 
 function openApplianceDialog(row) {
