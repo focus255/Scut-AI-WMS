@@ -14,7 +14,8 @@
               <el-icon :size="14" style="margin-right: 4px"><Plus /></el-icon>新增物料
             </el-button>
             <el-input v-model="materialKeyword" placeholder="搜索物料号或名称"
-              clearable size="small" style="width: 240px" @input="loadMaterials" />
+              clearable size="small" style="width: 240px" @keyup.enter="loadMaterials(1)" />
+            <el-button size="small" @click="loadMaterials(1)">搜索</el-button>
             <el-button size="small" @click="exportMaterials">导出 CSV</el-button>
           </div>
           <el-table :data="materialList" stripe size="small" v-loading="materialLoading" empty-text="暂无物料数据">
@@ -44,7 +45,8 @@
               <el-icon :size="14" style="margin-right: 4px"><Plus /></el-icon>新增器具
             </el-button>
             <el-input v-model="applianceKeyword" placeholder="搜索物料号/供应商/型号"
-              clearable size="small" style="width: 240px" @input="loadAppliances" />
+              clearable size="small" style="width: 240px" @keyup.enter="loadAppliances(1)" />
+            <el-button size="small" @click="loadAppliances(1)">搜索</el-button>
             <el-button size="small" @click="exportAppliances">导出 CSV</el-button>
           </div>
           <el-table :data="applianceList" stripe size="small" v-loading="applianceLoading" empty-text="暂无器具配置">
@@ -76,7 +78,8 @@
               <el-icon :size="14" style="margin-right: 4px"><Plus /></el-icon>新增供应商
             </el-button>
             <el-input v-model="supplierKeyword" placeholder="搜索供应商编码或名称"
-              clearable size="small" style="width: 240px" @input="loadSuppliers" />
+              clearable size="small" style="width: 240px" @keyup.enter="loadSuppliers(1)" />
+            <el-button size="small" @click="loadSuppliers(1)">搜索</el-button>
             <el-button size="small" @click="exportSuppliers">导出 CSV</el-button>
           </div>
           <el-table :data="supplierList" stripe size="small" v-loading="supplierLoading" empty-text="暂无供应商数据">
@@ -114,7 +117,10 @@
             <el-input v-model="materialForm.materialName" placeholder="如 左前大灯总成" />
           </el-form-item>
           <el-form-item label="默认供应商" prop="supplierCode">
-            <el-input v-model="materialForm.supplierCode" placeholder="如 SUP_VWG_09" />
+            <el-select v-model="materialForm.supplierCode" placeholder="选择已有供应商" filterable style="width:100%">
+              <el-option v-for="s in allSuppliers" :key="s.supplierCode"
+                :label="`${s.supplierName} (${s.supplierCode})`" :value="s.supplierCode" />
+            </el-select>
           </el-form-item>
         </el-form>
         <template #footer>
@@ -187,10 +193,16 @@
       <el-dialog v-model="applianceDialogVisible" :title="applianceDialogTitle" width="480px" destroy-on-close>
         <el-form ref="applianceFormRef" :model="applianceForm" :rules="applianceRules" label-width="110px">
           <el-form-item label="物料号" prop="materialCode">
-            <el-input v-model="applianceForm.materialCode" :disabled="!!applianceEditingRow" placeholder="如 M_PART_001" />
+            <el-select v-model="applianceForm.materialCode" :disabled="!!applianceEditingRow" placeholder="选择已有物料" filterable style="width:100%">
+              <el-option v-for="m in allMaterials" :key="m.materialCode"
+                :label="`${m.materialCode} — ${m.materialName}`" :value="m.materialCode" />
+            </el-select>
           </el-form-item>
           <el-form-item label="供应商编码" prop="supplierCode">
-            <el-input v-model="applianceForm.supplierCode" placeholder="如 SUP_VWG_09" />
+            <el-select v-model="applianceForm.supplierCode" placeholder="选择已有供应商" filterable style="width:100%">
+              <el-option v-for="s in allSuppliers" :key="s.supplierCode"
+                :label="`${s.supplierName} (${s.supplierCode})`" :value="s.supplierCode" />
+            </el-select>
           </el-form-item>
           <el-form-item label="包装器具型号" prop="packType">
             <el-input v-model="applianceForm.packType" placeholder="如 标准铁箱" />
@@ -306,8 +318,17 @@ const applianceRules = {
 }
 const applianceDialogTitle = computed(() => applianceEditingRow.value ? '编辑器具' : '新增器具')
 
+// ==================== 下拉选项缓存 ====================
+const allSuppliers = ref([])
+const allMaterials = ref([])
+
 // ==================== 初始化 ====================
-onMounted(() => loadMaterials())
+onMounted(async () => {
+  loadMaterials()
+  // 预加载全部供应商和物料用于下拉框
+  try { const s = await getSuppliers({ page: 1, size: 200 }); allSuppliers.value = s.records || [] } catch {}
+  try { const m = await getMaterials({ page: 1, size: 500 }); allMaterials.value = m.records || [] } catch {}
+})
 
 /**
  * 切换 Tab 时自动加载对应数据（防止首次点击 tab 时表格为空）。
