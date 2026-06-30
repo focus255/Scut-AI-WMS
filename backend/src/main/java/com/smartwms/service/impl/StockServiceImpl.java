@@ -11,6 +11,7 @@
 package com.smartwms.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.smartwms.dto.StockReportVO;
 import com.smartwms.entity.Barcode;
 import com.smartwms.entity.InboundDetail;
@@ -62,7 +63,7 @@ public class StockServiceImpl implements StockService {
     }
 
     @Override
-    public List<StockReportVO> getStockReport(String materialCode, String alarmStatus) {
+    public Page<StockReportVO> getStockReport(int page, int size, String materialCode, String alarmStatus) {
         LambdaQueryWrapper<Inventory> wrapper = new LambdaQueryWrapper<>();
 
         // 物料号模糊检索
@@ -71,7 +72,7 @@ public class StockServiceImpl implements StockService {
         }
 
         List<Inventory> inventories = inventoryMapper.selectList(wrapper);
-        List<StockReportVO> result = new ArrayList<>();
+        List<StockReportVO> all = new ArrayList<>();
 
         for (Inventory inv : inventories) {
             StockReportVO vo = buildReportVO(inv);
@@ -83,8 +84,20 @@ public class StockServiceImpl implements StockService {
                 }
             }
 
-            result.add(vo);
+            all.add(vo);
         }
+
+        // 内存分页（库存报表数据量通常在百条以内，构建 VO 需多次联表查询）
+        int total = all.size();
+        int fromIndex = (page - 1) * size;
+        if (fromIndex >= total) {
+            fromIndex = 0;
+        }
+        int toIndex = Math.min(fromIndex + size, total);
+        List<StockReportVO> records = fromIndex < total ? all.subList(fromIndex, toIndex) : new ArrayList<>();
+
+        Page<StockReportVO> result = new Page<>(page, size, total);
+        result.setRecords(records);
         return result;
     }
 

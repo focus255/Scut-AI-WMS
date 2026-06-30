@@ -53,6 +53,20 @@ public class InboundController {
     }
 
     /**
+     * 入库单摘要统计（全局，不受分页影响）。
+     * 注意：必须定义在 @GetMapping("/orders/{id}") 之前，否则 "summary" 会被当作 {id} 路径变量。
+     * GET /api/inbound/orders/summary
+     */
+    @GetMapping("/orders/summary")
+    public Result<Map<String, Object>> summary(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return Result.success(inboundService.summary(status, keyword, startDate, endDate));
+    }
+
+    /**
      * 查询入库单详情（含明细行）。
      * GET /api/inbound/orders/{id}
      */

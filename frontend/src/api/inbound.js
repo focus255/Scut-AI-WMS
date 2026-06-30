@@ -76,3 +76,11 @@ export function deleteInbound(id) {
 export function getInboundFlow(params) {
   return request.get('/inbound/flow', { params })
 }
+
+/**
+ * 入库单摘要统计（全局，不受分页影响）。
+ * @param {Object} params { status?, keyword?, startDate?, endDate? }
+ */
+export function getInboundSummary(params) {
+  return request.get('/inbound/orders/summary', { params })
+}

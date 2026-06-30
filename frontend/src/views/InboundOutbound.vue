@@ -49,6 +49,13 @@
               </template>
             </el-table-column>
           </el-table>
+          <div style="margin-top: 12px; display: flex; justify-content: flex-end">
+            <el-pagination
+              v-if="inboundTotal > inboundSize"
+              v-model:current-page="inboundPage" :page-size="inboundSize" :total="inboundTotal"
+              layout="total, prev, pager, next" size="small"
+              @current-change="loadOrders" />
+          </div>
         </el-tab-pane>
 
         <!-- === 出库管理 === -->
@@ -92,6 +99,13 @@
               </template>
             </el-table-column>
           </el-table>
+          <div style="margin-top: 12px; display: flex; justify-content: flex-end">
+            <el-pagination
+              v-if="outboundTotal > outboundSize"
+              v-model:current-page="outboundPage" :page-size="outboundSize" :total="outboundTotal"
+              layout="total, prev, pager, next" size="small"
+              @current-change="loadOutboundOrders" />
+          </div>
         </el-tab-pane>
       </el-tabs>
     </div>
@@ -634,8 +648,8 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Printer, Download } from '@element-plus/icons-vue'
-import { getInboundOrders, createInbound, updateInbound, confirmInbound, getInboundDetail, getInboundFlow, deleteInbound } from '@/api/inbound'
-import { getOutboundOrders, createOutbound, updateOutbound, deleteOutbound, confirmOutbound, getOutboundDetail, getOutboundHistories } from '@/api/outbound'
+import { getInboundOrders, createInbound, updateInbound, confirmInbound, getInboundDetail, getInboundFlow, deleteInbound, getInboundSummary } from '@/api/inbound'
+import { getOutboundOrders, createOutbound, updateOutbound, deleteOutbound, confirmOutbound, getOutboundDetail, getOutboundHistories, getOutboundSummary } from '@/api/outbound'
 import { getSuppliers } from '@/api/suppliers'
 import { getMaterials } from '@/api/materials'
 import { getAppliances } from '@/api/appliances'
@@ -722,6 +736,7 @@ const outEditTotalQty = computed(() =>
 // ==================== 入库列表 ====================
 const inboundList = ref([])
 const inboundLoading = ref(false)
+const inboundPage = ref(1), inboundSize = ref(20), inboundTotal = ref(0)
 
 // ==================== 供应商选项（动态加载） ====================
 const supplierOptions = ref([])
@@ -904,9 +919,9 @@ body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;-webkit-print-color-
 }
 function h(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
 
-// ==================== 计算属性 ====================
-const pendingCount = computed(() => inboundList.value.filter(row => row.status !== '已完成').length)
-const completedCount = computed(() => inboundList.value.filter(row => row.status === '已完成').length)
+// ==================== 状态计数（来自后端全局统计） ====================
+const pendingCount = ref(0)
+const completedCount = ref(0)
 
 onMounted(() => {
   loadOrders()
@@ -929,8 +944,15 @@ watch(activeTab, (tab) => {
 async function loadOrders() {
   inboundLoading.value = true
   try {
-    const data = await getInboundOrders({ page: 1, size: 50 })
+    const data = await getInboundOrders({ page: inboundPage.value, size: inboundSize.value })
     inboundList.value = data.records || []
+    inboundTotal.value = data.total || 0
+    // 全局状态统计（不受分页影响）
+    try {
+      const sum = await getInboundSummary({})
+      pendingCount.value = sum.pendingCount || 0
+      completedCount.value = sum.completedCount || 0
+    } catch { /* 摘要失败不影响列表展示 */ }
   } catch { /* */ } finally {
     inboundLoading.value = false
   }
@@ -1288,10 +1310,11 @@ async function handleInboundDelete(row) {
 // ==================== 出库管理 ====================
 const outboundList = ref([])
 const outboundLoading = ref(false)
+const outboundPage = ref(1), outboundSize = ref(20), outboundTotal = ref(0)
 
 // 统计
-const outPendingCount = computed(() => outboundList.value.filter(r => r.status !== '已完成').length)
-const outCompletedCount = computed(() => outboundList.value.filter(r => r.status === '已完成').length)
+const outPendingCount = ref(0)
+const outCompletedCount = ref(0)
 
 function outStatusClass(status) {
   if (status === '已完成') return 'badge-success'
@@ -1308,8 +1331,15 @@ function stampClass(s) {
 async function loadOutboundOrders() {
   outboundLoading.value = true
   try {
-    const data = await getOutboundOrders({ page: 1, size: 50 })
+    const data = await getOutboundOrders({ page: outboundPage.value, size: outboundSize.value })
     outboundList.value = data.records || []
+    outboundTotal.value = data.total || 0
+    // 全局状态统计（不受分页影响）
+    try {
+      const sum = await getOutboundSummary({})
+      outPendingCount.value = (sum.pendingCount || 0) + (sum.partialCount || 0)
+      outCompletedCount.value = sum.completedCount || 0
+    } catch { /* 摘要失败不影响列表展示 */ }
   } catch { /* */ } finally {
     outboundLoading.value = false
   }

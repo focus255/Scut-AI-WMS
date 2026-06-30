@@ -116,20 +116,8 @@ const query = reactive({
   orderNo: ''
 })
 
-// 状态统计
-const statusStats = computed(() => {
-  const s = { '待入库': 0, '在库': 0, '待出库': 0, '已出库': 0, '封存': 0 }
-  traceData.value.forEach(r => {
-    const st = r.status || ''
-    if (st === '待入库') s['待入库']++
-    else if (st === '在库') s['在库']++
-    else if (st === '待出库') s['待出库']++
-    else if (st === '已出库') s['已出库']++
-    else if (st === 'FROZEN' || st === '封存') s['封存']++
-    else s['封存']++ // 未识别的状态也归入封存/异常
-  })
-  return s
-})
+// 状态统计（来自后端全局统计，不受分页影响）
+const statusStats = ref({ '待入库': 0, '在库': 0, '待出库': 0, '已出库': 0, '封存': 0 })
 
 onMounted(async () => {
   try {
@@ -164,6 +152,17 @@ async function doQuery() {
     })
     traceData.value = data.items || []
     traceTotal.value = data.totalCount || 0
+    // 使用后端返回的全局状态统计（不受分页影响）
+    if (data.statusStats) {
+      const ss = data.statusStats
+      statusStats.value = {
+        '待入库': ss['待入库'] || 0,
+        '在库': ss['在库'] || 0,
+        '待出库': ss['待出库'] || 0,
+        '已出库': ss['已出库'] || 0,
+        '封存': (ss['FROZEN'] || 0)
+      }
+    }
   } catch {
     traceData.value = []
     ElMessage.error('追溯查询失败')

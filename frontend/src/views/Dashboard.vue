@@ -262,8 +262,8 @@ onUnmounted(() => {
 async function loadData() {
   stockLoading.value = true
   try {
-    const data = await getStockReport({})
-    stockData.value = data || []
+    const data = await getStockReport({ page: 1, size: 500 })
+    stockData.value = data.records || []
     stats.totalSku = stockData.value.length
     stats.deadStockCount = stockData.value.filter(r => r.ruleEvaluation === 'DEAD_STOCK').length
     stats.highRiskCount = stockData.value.filter(r => r.ruleEvaluation === 'LOW_STOCK').length
@@ -309,9 +309,9 @@ async function loadRecentActivity() {
 function startAlertPolling() {
   alertTimer = setInterval(async () => {
     try {
-      const data = await getStockReport({})
+      const data = await getStockReport({ page: 1, size: 500 })
       const currentLowSet = new Set()
-      ;(data || []).forEach(r => {
+      ;(data.records || []).forEach(r => {
         if (r.ruleEvaluation === 'LOW_STOCK') currentLowSet.add(r.materialCode)
       })
       // 检测新增的低储物料

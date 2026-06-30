@@ -171,6 +171,45 @@ public class OutboundServiceImpl implements OutboundService {
         return outboundOrderMapper.selectPage(page, wrapper);
     }
 
+    @Override
+    public Map<String, Object> summary(String status, String orderNo, LocalDate startDate, LocalDate endDate) {
+        LambdaQueryWrapper<OutboundOrder> wrapper = new LambdaQueryWrapper<>();
+        if (status != null && !status.isBlank()) wrapper.eq(OutboundOrder::getStatus, status.trim());
+        if (orderNo != null && !orderNo.isBlank()) wrapper.like(OutboundOrder::getOrderNo, orderNo.trim());
+        if (startDate != null) wrapper.ge(OutboundOrder::getCreatedAt, startDate.atStartOfDay());
+        if (endDate != null) wrapper.le(OutboundOrder::getCreatedAt, endDate.atTime(23, 59, 59));
+
+        // 出库单总数
+        long totalBatches = outboundOrderMapper.selectCount(wrapper);
+
+        // 出库总件数 + 状态统计
+        List<OutboundOrder> orders = outboundOrderMapper.selectList(wrapper);
+        int totalQty = 0;
+        int pendingCount = 0;
+        int completedCount = 0;
+        int partialCount = 0;
+        for (OutboundOrder o : orders) {
+            if ("已完成".equals(o.getStatus())) completedCount++;
+            else if ("部分完成".equals(o.getStatus())) partialCount++;
+            else pendingCount++;
+        }
+        if (!orders.isEmpty()) {
+            List<Long> orderIds = orders.stream().map(OutboundOrder::getId).collect(Collectors.toList());
+            List<OutboundDetail> details = outboundDetailMapper.selectList(
+                    new LambdaQueryWrapper<OutboundDetail>().in(OutboundDetail::getOutboundId, orderIds)
+            );
+            totalQty = details.stream().mapToInt(d -> d.getActualQty() != null ? d.getActualQty() : 0).sum();
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("totalBatches", totalBatches);
+        result.put("totalQty", totalQty);
+        result.put("pendingCount", pendingCount);
+        result.put("completedCount", completedCount);
+        result.put("partialCount", partialCount);
+        return result;
+    }
+
     /**
      * 查询出库单详情及流水。
      */

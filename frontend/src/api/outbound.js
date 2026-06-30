@@ -70,3 +70,11 @@ export function deleteOutbound(id) {
 export function unifiedScan(data) {
   return request.post('/outbound/scan', data)
 }
+
+/**
+ * 出库单摘要统计（全局，不受分页影响）。
+ * @param {Object} params { status?, orderNo?, startDate?, endDate? }
+ */
+export function getOutboundSummary(params) {
+  return request.get('/outbound/orders/summary', { params })
+}

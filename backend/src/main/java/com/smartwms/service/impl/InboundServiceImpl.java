@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +51,7 @@ public class InboundServiceImpl implements InboundService {
     private final MaterialMapper materialMapper;
     private final ApplianceMapper applianceMapper;
     private final OutboundHistoryMapper outboundHistoryMapper;
+    private final InventoryFreezeMapper inventoryFreezeMapper;
 
     public InboundServiceImpl(InboundOrderMapper inboundOrderMapper,
                                InboundDetailMapper inboundDetailMapper,
@@ -57,7 +59,8 @@ public class InboundServiceImpl implements InboundService {
                                BarcodeMapper barcodeMapper,
                                MaterialMapper materialMapper,
                                ApplianceMapper applianceMapper,
-                               OutboundHistoryMapper outboundHistoryMapper) {
+                               OutboundHistoryMapper outboundHistoryMapper,
+                               InventoryFreezeMapper inventoryFreezeMapper) {
         this.inboundOrderMapper = inboundOrderMapper;
         this.inboundDetailMapper = inboundDetailMapper;
         this.inventoryMapper = inventoryMapper;
@@ -65,6 +68,7 @@ public class InboundServiceImpl implements InboundService {
         this.materialMapper = materialMapper;
         this.applianceMapper = applianceMapper;
         this.outboundHistoryMapper = outboundHistoryMapper;
+        this.inventoryFreezeMapper = inventoryFreezeMapper;
     }
 
     /**
@@ -297,6 +301,44 @@ public class InboundServiceImpl implements InboundService {
         if (endDate != null) wrapper.le(InboundOrder::getCreatedAt, endDate.plusDays(1).atStartOfDay());
         wrapper.orderByDesc(InboundOrder::getCreatedAt);
         return inboundOrderMapper.selectPage(page, wrapper);
+    }
+
+    @Override
+    public Map<String, Object> summary(String status, String keyword, LocalDate startDate, LocalDate endDate) {
+        LambdaQueryWrapper<InboundOrder> wrapper = new LambdaQueryWrapper<>();
+        if (status != null && !status.isBlank()) wrapper.eq(InboundOrder::getStatus, status);
+        if (keyword != null && !keyword.isBlank()) {
+            wrapper.and(w -> w.like(InboundOrder::getOrderNo, keyword).or().like(InboundOrder::getSupplierCode, keyword));
+        }
+        if (startDate != null) wrapper.ge(InboundOrder::getCreatedAt, startDate.atStartOfDay());
+        if (endDate != null) wrapper.le(InboundOrder::getCreatedAt, endDate.plusDays(1).atStartOfDay());
+
+        // 入库单总数
+        long totalBatches = inboundOrderMapper.selectCount(wrapper);
+
+        // 入库总件数：汇总匹配入库单的入库明细 actualQty
+        List<InboundOrder> orders = inboundOrderMapper.selectList(wrapper);
+        int totalQty = 0;
+        int pendingCount = 0;
+        int completedCount = 0;
+        for (InboundOrder o : orders) {
+            if ("已完成".equals(o.getStatus())) completedCount++;
+            else pendingCount++;
+        }
+        if (!orders.isEmpty()) {
+            List<Long> orderIds = orders.stream().map(InboundOrder::getId).collect(Collectors.toList());
+            List<InboundDetail> details = inboundDetailMapper.selectList(
+                    new LambdaQueryWrapper<InboundDetail>().in(InboundDetail::getInboundId, orderIds)
+            );
+            totalQty = details.stream().mapToInt(d -> d.getActualQty() != null ? d.getActualQty() : 0).sum();
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("totalBatches", totalBatches);
+        result.put("totalQty", totalQty);
+        result.put("pendingCount", pendingCount);
+        result.put("completedCount", completedCount);
+        return result;
     }
 
     @Override
@@ -548,6 +590,11 @@ public class InboundServiceImpl implements InboundService {
         if (hasMaterial) wrapper.eq(Barcode::getMaterialCode, materialCode);
         if (hasBarcode) wrapper.eq(Barcode::getBarcode, barcode);
         if (inboundIds != null) wrapper.in(Barcode::getInboundId, inboundIds);
+
+        // 全局状态统计（不受分页影响，统计当前筛选条件下的全部条码）
+        Map<String, Integer> statusStats = computeStatusStats(hasMaterial, materialCode,
+                hasBarcode, barcode, inboundIds);
+
         wrapper.orderByDesc(Barcode::getCreatedAt);
 
         Page<Barcode> barcodePage = new Page<>(page, size);
@@ -572,7 +619,48 @@ public class InboundServiceImpl implements InboundService {
             items.add(InventoryTraceVO.TraceItem.from(bc, detail, outboundHistory));
         }
 
-        return InventoryTraceVO.of(items, barcodePage.getTotal());
+        return InventoryTraceVO.of(items, barcodePage.getTotal(), statusStats);
+    }
+
+    /**
+     * 统计当前筛选条件下各状态的条码数量（全局，不分页）。
+     *
+     * @author Focus
+     * @date 2026-06-30
+     */
+    private Map<String, Integer> computeStatusStats(boolean hasMaterial, String materialCode,
+                                                     boolean hasBarcode, String barcode,
+                                                     List<Long> inboundIds) {
+        LambdaQueryWrapper<Barcode> countWrapper = new LambdaQueryWrapper<>();
+        countWrapper.eq(Barcode::getType, "inbound");
+        if (hasMaterial) countWrapper.eq(Barcode::getMaterialCode, materialCode);
+        if (hasBarcode) countWrapper.eq(Barcode::getBarcode, barcode);
+        if (inboundIds != null) countWrapper.in(Barcode::getInboundId, inboundIds);
+
+        List<Barcode> all = barcodeMapper.selectList(countWrapper);
+        Map<String, Integer> stats = new LinkedHashMap<>();
+        stats.put("待入库", 0);
+        stats.put("在库", 0);
+        stats.put("待出库", 0);
+        stats.put("已出库", 0);
+        stats.put("FROZEN", 0);
+        for (Barcode bc : all) {
+            String st = bc.getStatus();
+            if (st != null) {
+                stats.merge(st, 1, Integer::sum);
+            }
+        }
+
+        // 补充统计封存表中的活跃 FROZEN 记录（防止种子数据中 barcodeId=0 导致遗漏）
+        LambdaQueryWrapper<InventoryFreeze> freezeWrapper = new LambdaQueryWrapper<>();
+        freezeWrapper.eq(InventoryFreeze::getStatus, "FROZEN");
+        if (hasMaterial) freezeWrapper.eq(InventoryFreeze::getMaterialCode, materialCode);
+        if (hasBarcode) freezeWrapper.eq(InventoryFreeze::getBarcode, barcode);
+        long frozenCount = inventoryFreezeMapper.selectCount(freezeWrapper);
+        // 取封存表计数与条码表 FROZEN 计数的较大值，避免同时计数重复
+        stats.put("FROZEN", Math.max(stats.get("FROZEN"), (int) frozenCount));
+
+        return stats;
     }
 
     // ==================== 扫码入库辅助方法 ====================

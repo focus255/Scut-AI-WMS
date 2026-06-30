@@ -61,7 +61,7 @@
       <div style="margin-top: 12px; display: flex; justify-content: flex-end">
         <el-pagination
           v-if="total > size"
-          :current-page="page" :page-size="size" :total="total"
+          v-model:current-page="page" :page-size="size" :total="total"
           layout="total, prev, pager, next" size="small"
           @current-change="loadList" />
       </div>

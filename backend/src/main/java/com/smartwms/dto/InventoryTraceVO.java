@@ -12,20 +12,28 @@ import com.smartwms.entity.OutboundHistory;
 
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class InventoryTraceVO {
 
     private List<TraceItem> items;
     private int totalCount;
+    /** 全局状态统计（不受分页影响，统计当前筛选条件下的全部条码） */
+    private Map<String, Integer> statusStats;
 
     public static InventoryTraceVO of(List<TraceItem> items) {
-        return of(items, items != null ? items.size() : 0);
+        return of(items, items != null ? items.size() : 0, null);
     }
     public static InventoryTraceVO of(List<TraceItem> items, long totalCount) {
+        return of(items, totalCount, null);
+    }
+    public static InventoryTraceVO of(List<TraceItem> items, long totalCount, Map<String, Integer> statusStats) {
         InventoryTraceVO vo = new InventoryTraceVO();
         vo.setItems(items != null ? items : new ArrayList<>());
         vo.setTotalCount((int) totalCount);
+        vo.setStatusStats(statusStats);
         return vo;
     }
 
@@ -36,6 +44,9 @@ public class InventoryTraceVO {
 
     public int getTotalCount() { return totalCount; }
     public void setTotalCount(int totalCount) { this.totalCount = totalCount; }
+
+    public Map<String, Integer> getStatusStats() { return statusStats; }
+    public void setStatusStats(Map<String, Integer> statusStats) { this.statusStats = statusStats; }
 
     /**
      * 单条追溯记录，由二维码与入库明细联查组装。

@@ -28,7 +28,7 @@
         </el-select>
         <el-button size="small" @click="loadReport">刷新</el-button>
         <el-button size="small" @click="doExport">导出 CSV</el-button>
-        <span class="toolbar-tip">共 {{ reportData.length }} 条记录</span>
+        <span class="toolbar-tip">共 {{ total }} 条记录</span>
       </div>
 
       <el-table :data="reportData" stripe size="small" v-loading="loading"
@@ -75,6 +75,13 @@
           </template>
         </el-table-column>
       </el-table>
+      <div style="margin-top: 12px; display: flex; justify-content: flex-end">
+        <el-pagination
+          v-if="total > pageSize"
+          v-model:current-page="page" :page-size="pageSize" :total="total"
+          layout="total, prev, pager, next" size="small"
+          @current-change="loadReport" />
+      </div>
     </div>
   </div>
 </template>
@@ -91,6 +98,7 @@ import ChartCard from '@/components/ChartCard.vue'
 
 const reportData = ref([])
 const loading = ref(false)
+const page = ref(1), pageSize = ref(20), total = ref(0)
 const filterCode = ref('')
 const filterStatus = ref('')
 
@@ -99,8 +107,14 @@ onMounted(() => loadReport())
 async function loadReport() {
   loading.value = true
   try {
-    const data = await getStockReport({ materialCode: filterCode.value || undefined, alarmStatus: filterStatus.value || undefined })
-    reportData.value = data || []
+    const data = await getStockReport({
+      materialCode: filterCode.value || undefined,
+      alarmStatus: filterStatus.value || undefined,
+      page: page.value,
+      size: pageSize.value
+    })
+    reportData.value = data.records || []
+    total.value = data.total || 0
   } catch { ElMessage.error('加载报表失败') } finally { loading.value = false }
 }
 

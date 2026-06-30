@@ -17,6 +17,7 @@ import com.smartwms.entity.InboundOrder;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 public interface InboundService {
 
@@ -69,4 +70,10 @@ public interface InboundService {
      * 库存追溯：按物料/二维码/入库单号查询二维码生命周期轨迹。
      */
     InventoryTraceVO trace(String materialCode, String barcode, String orderNo, int page, int size);
+
+    /**
+     * 入库单摘要统计（全局，不受分页影响）。
+     * 返回 totalBatches / totalQty / pendingCount / completedCount。
+     */
+    Map<String, Object> summary(String status, String keyword, LocalDate startDate, LocalDate endDate);
 }

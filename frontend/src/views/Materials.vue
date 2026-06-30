@@ -32,7 +32,7 @@
           <div style="margin-top: 12px; display: flex; justify-content: flex-end">
             <el-pagination
               v-if="materialTotal > 10"
-              :current-page="materialPage" :page-size="10" :total="materialTotal"
+              v-model:current-page="materialPage" :page-size="10" :total="materialTotal"
               layout="total, prev, pager, next" size="small"
               @current-change="loadMaterials" />
           </div>
@@ -65,7 +65,7 @@
           <div style="margin-top: 12px; display: flex; justify-content: flex-end">
             <el-pagination
               v-if="applianceTotal > 10"
-              :current-page="appliancePage" :page-size="10" :total="applianceTotal"
+              v-model:current-page="appliancePage" :page-size="10" :total="applianceTotal"
               layout="total, prev, pager, next" size="small"
               @current-change="loadAppliances" />
           </div>
@@ -98,7 +98,7 @@
           <div style="margin-top: 12px; display: flex; justify-content: flex-end">
             <el-pagination
               v-if="supplierTotal > 10"
-              :current-page="supplierPage" :page-size="10" :total="supplierTotal"
+              v-model:current-page="supplierPage" :page-size="10" :total="supplierTotal"
               layout="total, prev, pager, next" size="small"
               @current-change="loadSuppliers" />
           </div>

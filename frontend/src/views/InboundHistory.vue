@@ -93,8 +93,8 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { getInboundOrders } from '@/api/inbound'
-import { getOutboundOrders } from '@/api/outbound'
+import { getInboundOrders, getInboundSummary } from '@/api/inbound'
+import { getOutboundOrders, getOutboundSummary } from '@/api/outbound'
 
 const activeTab = ref('inbound')
 
@@ -118,8 +118,20 @@ async function loadInboundHistory() {
     const data = await getInboundOrders(params)
     inboundList.value = data.records || []
     inboundTotal.value = data.total || 0
-    inboundSummary.totalBatches = inboundTotal.value
-    inboundSummary.totalQty = (data.records || []).reduce((s, r) => s + (r.actualQty || 0), 0)
+    inboundSummary.totalBatches = data.total || 0
+    // 汇总统计使用后端摘要接口（全局，不受分页影响；失败时回退到分页 total）
+    try {
+      const summaryParams = {}
+      if (inboundDateRange.value) {
+        summaryParams.startDate = inboundDateRange.value[0]
+        summaryParams.endDate = inboundDateRange.value[1]
+      }
+      if (inboundStatus.value) summaryParams.status = inboundStatus.value
+      if (inboundKeyword.value.trim()) summaryParams.keyword = inboundKeyword.value.trim()
+      const sum = await getInboundSummary(summaryParams)
+      inboundSummary.totalBatches = sum.totalBatches || inboundTotal.value
+      inboundSummary.totalQty = sum.totalQty || 0
+    } catch { /* 摘要接口失败不影响列表展示 */ }
   } catch {
     inboundList.value = []
     ElMessage.error('加载入库历史失败')
@@ -152,8 +164,20 @@ async function loadOutboundHistory() {
     const data = await getOutboundOrders(params)
     outboundList.value = data.records || []
     outboundTotal.value = data.total || 0
-    outboundSummary.totalBatches = outboundTotal.value
-    outboundSummary.totalQty = (data.records || []).reduce((s, r) => s + (r.actualQty || 0), 0)
+    outboundSummary.totalBatches = data.total || 0
+    // 汇总统计使用后端摘要接口（全局，不受分页影响；失败时回退到分页 total）
+    try {
+      const summaryParams = {}
+      if (outboundDateRange.value) {
+        summaryParams.startDate = outboundDateRange.value[0]
+        summaryParams.endDate = outboundDateRange.value[1]
+      }
+      if (outboundStatus.value) summaryParams.status = outboundStatus.value
+      if (outboundKeyword.value.trim()) summaryParams.orderNo = outboundKeyword.value.trim()
+      const sum = await getOutboundSummary(summaryParams)
+      outboundSummary.totalBatches = sum.totalBatches || outboundTotal.value
+      outboundSummary.totalQty = sum.totalQty || 0
+    } catch { /* 摘要接口失败不影响列表展示 */ }
   } catch {
     outboundList.value = []
     ElMessage.error('加载出库历史失败')

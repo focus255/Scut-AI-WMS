@@ -9,6 +9,7 @@ import com.smartwms.dto.ScanResponse;
 import com.smartwms.entity.OutboundOrder;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 /**
  * 出库服务接口。
@@ -44,4 +45,10 @@ public interface OutboundService {
      * 删除出库单（仅"未完成"状态可删除，退回已拣库存）。
      */
     void delete(Long id);
+
+    /**
+     * 出库单摘要统计（全局，不受分页影响）。
+     * 返回 totalBatches / totalQty / pendingCount / completedCount。
+     */
+    Map<String, Object> summary(String status, String orderNo, LocalDate startDate, LocalDate endDate);
 }

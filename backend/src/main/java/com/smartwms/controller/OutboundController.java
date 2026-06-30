@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 /**
  * 出库管理及统一扫码控制器。
@@ -61,6 +62,20 @@ public class OutboundController {
                                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
                                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         return Result.success(outboundService.page(page, size, status, orderNo, startDate, endDate));
+    }
+
+    /**
+     * 出库单摘要统计（全局，不受分页影响）。
+     * 注意：必须定义在 @GetMapping("/orders/{id}") 之前，否则 "summary" 会被当作 {id} 路径变量。
+     * GET /api/outbound/orders/summary
+     */
+    @GetMapping("/orders/summary")
+    public Result<Map<String, Object>> summary(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String orderNo,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return Result.success(outboundService.summary(status, orderNo, startDate, endDate));
     }
 
     /**
