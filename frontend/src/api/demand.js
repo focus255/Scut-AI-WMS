@@ -15,7 +15,7 @@ export function regenerateDemandForecast(materialCode) {
   return request.post(`/demand/forecasts/${encodeURIComponent(materialCode)}`)
 }
 
-/** 批量生成全部物料需求预测 */
+/** 批量生成全部物料需求预测（超时 5 分钟，物料多时 AI 调用耗时较长） */
 export function generateAllDemandForecasts() {
-  return request.post('/demand/forecasts/generate-all')
+  return request.post('/demand/forecasts/generate-all', null, { timeout: 300000 })
 }
